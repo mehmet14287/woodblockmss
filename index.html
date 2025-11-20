@@ -43,6 +43,15 @@
             transform: translateZ(0);
             backface-visibility: hidden;
         }
+
+        /* Custom CSS Particle for performance */
+        .particle {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            border-radius: 2px;
+            will-change: transform, opacity;
+        }
     </style>
 <script type="importmap">
 {
@@ -127,6 +136,49 @@
         };
 
         const createEmptyGrid = () => Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+
+        // --- PARTICLE SYSTEM (Direct DOM for Performance) ---
+        const createParticleExplosion = (x, y, color) => {
+            // Limit particles per block to 4 for performance on low-end devices
+            const particleCount = 4; 
+            
+            for (let i = 0; i < particleCount; i++) {
+                const el = document.createElement('div');
+                el.className = 'particle';
+                
+                // Randomize size slightly
+                const size = 6 + Math.random() * 6;
+                el.style.width = `${size}px`;
+                el.style.height = `${size}px`;
+                el.style.backgroundColor = color;
+                el.style.left = `${x}px`;
+                el.style.top = `${y}px`;
+                
+                document.body.appendChild(el);
+
+                // Random velocities
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 20 + Math.random() * 30; // px distance
+                const tx = Math.cos(angle) * velocity;
+                const ty = Math.sin(angle) * velocity + 30; // add gravity component to Y
+                const rotation = Math.random() * 360;
+
+                // Web Animations API - optimized for compositor thread
+                const animation = el.animate([
+                    { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
+                    { transform: `translate(${tx}px, ${ty}px) rotate(${rotation}deg)`, opacity: 0 }
+                ], {
+                    duration: 400 + Math.random() * 200,
+                    easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+                    fill: 'forwards'
+                });
+
+                animation.onfinish = () => {
+                    el.remove();
+                };
+            }
+        };
+
 
         // --- AUDIO UTILS ---
         let audioCtx = null;
@@ -262,87 +314,6 @@
 
         // --- COMPONENTS ---
 
-        const ParticleOverlay = React.memo(({ bursts, onComplete }) => {
-            const canvasRef = React.useRef(null);
-            const particles = React.useRef([]);
-            const frameId = React.useRef(0);
-
-            React.useEffect(() => {
-                if (bursts.length === 0) return;
-                
-                bursts.forEach(burst => {
-                    // More particles for crumbling effect
-                    for (let i = 0; i < 8; i++) {
-                        // Initial explosion velocity (outward)
-                        const angle = Math.random() * Math.PI * 2;
-                        const speed = 1 + Math.random() * 3;
-                        
-                        particles.current.push({
-                            x: burst.x,
-                            y: burst.y,
-                            vx: Math.cos(angle) * speed,
-                            vy: (Math.sin(angle) * speed) - 2, // Initial upward pop
-                            life: 1.0,
-                            decay: 0.015 + Math.random() * 0.02,
-                            color: burst.color,
-                            size: 3 + Math.random() * 5,
-                            gravity: 0.25 // Gravity factor
-                        });
-                    }
-                });
-
-                const animate = () => {
-                    const canvas = canvasRef.current;
-                    if (!canvas) return;
-                    const ctx = canvas.getContext('2d');
-                    if (!ctx) return;
-
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                    for (let i = particles.current.length - 1; i >= 0; i--) {
-                        const p = particles.current[i];
-                        
-                        // Apply physics
-                        p.vy += p.gravity; // Apply gravity
-                        p.x += p.vx;
-                        p.y += p.vy;
-                        
-                        p.life -= p.decay;
-                        
-                        if (p.life <= 0 || p.y > canvas.height) {
-                            particles.current.splice(i, 1);
-                        } else {
-                            ctx.beginPath();
-                            // Draw square/woodchip shape
-                            ctx.rect(p.x, p.y, p.size, p.size);
-                            ctx.fillStyle = p.color;
-                            ctx.globalAlpha = p.life;
-                            ctx.fill();
-                        }
-                    }
-                    ctx.globalAlpha = 1.0;
-
-                    if (particles.current.length > 0) {
-                        frameId.current = requestAnimationFrame(animate);
-                    } else {
-                        onComplete();
-                    }
-                };
-
-                if (canvasRef.current) {
-                    canvasRef.current.width = window.innerWidth;
-                    canvasRef.current.height = window.innerHeight;
-                }
-                animate();
-                return () => {
-                    cancelAnimationFrame(frameId.current);
-                    particles.current = [];
-                };
-            }, [bursts, onComplete]);
-
-            return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[1000]" />;
-        });
-
         const BlockPiece = React.memo(({ piece, size = 'md', customCellSize, className = '', onInteract, isSelected, style }) => {
             const cellSize = customCellSize || (size === 'sm' ? 12 : size === 'md' ? 20 : 32);
             const gap = 1;
@@ -404,7 +375,6 @@
                                         }
                                     }
                                     
-                                    // Check if this cell is part of a predicted clear
                                     const isClearingHint = clearingCells && clearingCells.has(`${rIndex}-${cIndex}`);
 
                                     return (
@@ -437,7 +407,7 @@
             );
         }), (prevProps, nextProps) => {
             if (prevProps.grid !== nextProps.grid) return false;
-            if (prevProps.clearingCells !== nextProps.clearingCells) return false; // Re-render if predictions change
+            if (prevProps.clearingCells !== nextProps.clearingCells) return false; 
             if (prevProps.previewPlacement === null && nextProps.previewPlacement === null) return true;
             if (prevProps.previewPlacement && nextProps.previewPlacement) {
                 return prevProps.previewPlacement.row === nextProps.previewPlacement.row && 
@@ -484,7 +454,6 @@
         const STORAGE_KEY_MUSIC = 'woodblock_music';
 
         const App = () => {
-            // Load persisted state
             const getInitialGameState = () => {
                 try {
                     const saved = localStorage.getItem(STORAGE_KEY_GAME);
@@ -511,22 +480,22 @@
             
             const [isMusicOn, setIsMusicOn] = React.useState(() => {
                 const saved = localStorage.getItem(STORAGE_KEY_MUSIC);
-                return saved !== null ? JSON.parse(saved) : true; // Default true if no preference
+                return saved !== null ? JSON.parse(saved) : true; 
             });
 
             const gridRef = React.useRef(null);
-            const dragItemRef = React.useRef(null); // Direct DOM reference for performance
-            const lastFrameTime = React.useRef(0); // FPS throttle
+            const dragItemRef = React.useRef(null); 
+            const lastFrameTime = React.useRef(0); 
 
             const [dragState, setDragState] = React.useState(null);
             const [previewPlacement, setPreviewPlacement] = React.useState(null);
-            const [clearingCells, setClearingCells] = React.useState(null); // Set of 'r-c' strings
-            const [gameOver, setGameOver] = React.useState(false);
-            const [effects, setEffects] = React.useState([]);
+            const [clearingCells, setClearingCells] = React.useState(null); 
+            
+            // Game Over Info
+            const [gameOverInfo, setGameOverInfo] = React.useState(null); 
 
-            // Persistence Effect
             React.useEffect(() => {
-                if (!gameOver) {
+                if (!gameOverInfo) {
                     const stateToSave = {
                         grid,
                         currentPieces,
@@ -538,9 +507,8 @@
                 } else {
                     localStorage.removeItem(STORAGE_KEY_GAME);
                 }
-            }, [grid, currentPieces, score, level, gameOver]);
+            }, [grid, currentPieces, score, level, gameOverInfo]);
 
-            // Music Persistence & Autoplay Effect
             React.useEffect(() => {
                 localStorage.setItem(STORAGE_KEY_MUSIC, JSON.stringify(isMusicOn));
                 if (isMusicOn) {
@@ -580,12 +548,8 @@
                 return true;
             }, []);
 
-            // Simulates a move to see which cells would be cleared
             const predictMatches = React.useCallback((board, piece, row, col) => {
-                // Create a temporary board copy
                 const tempBoard = board.map(r => [...r]);
-                
-                // Place piece
                 for (let r = 0; r < piece.shape.length; r++) {
                     for (let c = 0; c < piece.shape[0].length; c++) {
                         if (piece.shape[r][c] === 1) {
@@ -597,20 +561,16 @@
                 }
 
                 const clearing = new Set();
-                
-                // Check Rows
                 for (let r = 0; r < GRID_SIZE; r++) {
                     if (tempBoard[r].every(cell => cell === 1)) {
                         for(let c = 0; c < GRID_SIZE; c++) clearing.add(`${r}-${c}`);
                     }
                 }
-                // Check Cols
                 for (let c = 0; c < GRID_SIZE; c++) {
                     if (tempBoard.every(row => row[c] === 1)) {
                         for(let r = 0; r < GRID_SIZE; r++) clearing.add(`${r}-${c}`);
                     }
                 }
-                // Check Boxes
                 for (let br = 0; br < 9; br += 3) {
                     for (let bc = 0; bc < 9; bc += 3) {
                         let full = true;
@@ -646,10 +606,8 @@
                 const lines = rowsToClear.length + colsToClear.length + boxesToClear.length;
                 if (lines > 0) {
                     playComboSound(lines);
-                    const newEffects = [];
                     const gridRect = gridRef.current?.getBoundingClientRect();
                     
-                    // Identify all cells being cleared for particles
                     const clearedCells = new Set();
                     rowsToClear.forEach(r => { for(let c=0; c<9; c++) clearedCells.add(`${r}-${c}`); });
                     colsToClear.forEach(c => { for(let r=0; r<9; r++) clearedCells.add(`${r}-${c}`); });
@@ -661,13 +619,13 @@
                         const cellSize = gridRect.width / 9;
                         const getCenter = (r, c) => ({ x: gridRect.left + (c * cellSize) + (cellSize / 2), y: gridRect.top + (r * cellSize) + (cellSize / 2) });
                         
-                        // Spawn particles at EACH cleared block for "pouring" effect
+                        // Trigger High-Performance DOM Animations
                         clearedCells.forEach(key => {
                             const [r, c] = key.split('-').map(Number);
-                            newEffects.push({ ...getCenter(r, c), color: '#f59e0b' });
+                            const pos = getCenter(r, c);
+                            createParticleExplosion(pos.x, pos.y, '#f59e0b');
                         });
                     }
-                    setEffects(prev => [...prev, ...newEffects]);
 
                     const comboMultiplier = lines === 1 ? 1 : lines === 2 ? 3 : lines === 3 ? 6 : 10;
                     newScore += 100 * comboMultiplier;
@@ -700,15 +658,22 @@
 
             const checkGameOver = (board, pieces) => {
                 const available = pieces.filter(p => p !== null);
-                if (available.length === 0) return false;
+                if (available.length === 0) return null;
+                
+                // Check if any piece can be placed
                 for (const piece of available) {
                     for (let r = 0; r < GRID_SIZE; r++) {
                         for (let c = 0; c < GRID_SIZE; c++) {
-                            if (canPlacePiece(board, piece, r, c)) return false;
+                            if (canPlacePiece(board, piece, r, c)) return null; // Game continues
                         }
                     }
                 }
-                return true;
+                
+                // If we are here, NO piece can be placed. Find the first one that failed as the reason.
+                return {
+                    failedPiece: available[0],
+                    message: "Bu parça sığmıyor!"
+                };
             };
 
             const handlePointerDown = React.useCallback((e, index) => {
@@ -766,20 +731,16 @@
                         const col = Math.floor(relativeX / dragState.gridCellSize);
                         const row = Math.floor(relativeY / dragState.gridCellSize);
                         
-                        // Logic: Check placement and predict clearing
                         if (canPlacePiece(grid, piece, row, col)) {
                              setPreviewPlacement(prev => {
                                  if (prev && prev.row === row && prev.col === col) return prev;
                                  return { row, col, shape: piece.shape };
                              });
                              
-                             // Run prediction
                              const predictedClears = predictMatches(grid, piece, row, col);
                              setClearingCells(prev => {
-                                 // Simple equality check to avoid re-renders
                                  if (!prev && !predictedClears) return null;
                                  if (prev && predictedClears && prev.size === predictedClears.size) {
-                                     // Deep check could go here, but size check is usually enough for throttling
                                      let same = true;
                                      for(let k of predictedClears) if(!prev.has(k)) { same=false; break; }
                                      if(same) return prev;
@@ -815,15 +776,20 @@
                         const newPieces = [...currentPieces];
                         newPieces[dragState.pieceIndex] = null;
                         setCurrentPieces(newPieces);
+                        
+                        // This triggers the DOM animations synchronously
                         checkMatches(newGrid);
+
                         if (newPieces.every(p => p === null)) {
                             setTimeout(() => {
                                 const nextPieces = [generateRandomPiece(), generateRandomPiece(), generateRandomPiece()];
                                 setCurrentPieces(nextPieces);
-                                if (checkGameOver(newGrid, nextPieces)) setGameOver(true);
+                                const lost = checkGameOver(newGrid, nextPieces);
+                                if (lost) setGameOverInfo(lost);
                             }, 200);
                         } else {
-                            if (checkGameOver(newGrid, newPieces)) setGameOver(true);
+                            const lost = checkGameOver(newGrid, newPieces);
+                            if (lost) setGameOverInfo(lost);
                         }
                     }
                     setDragState(null);
@@ -845,14 +811,13 @@
                 setCurrentPieces([generateRandomPiece(), generateRandomPiece(), generateRandomPiece()]);
                 setScore(0);
                 setLevel(1);
-                setGameOver(false);
+                setGameOverInfo(null);
                 setDragState(null);
                 setClearingCells(null);
             }, []);
 
             return (
                 <div className="min-h-screen wood-texture flex items-center justify-center p-4 selection:bg-transparent overflow-hidden">
-                    <ParticleOverlay bursts={effects} onComplete={() => setEffects([])} />
                     <div className="max-w-lg w-full flex flex-col items-center relative">
                         <h1 className="text-3xl md:text-4xl font-black text-[#3e2723] mb-2 drop-shadow-sm tracking-tighter select-none">
                             WOODBLOCK <span className="text-amber-100">ZEN</span>
@@ -891,12 +856,20 @@
                             </div>
                         )}
                         <div className="mt-4 text-stone-400 text-xs text-center select-none">Blokları tahtaya sürükleyin. Puan kazanmak için satırları temizleyin.</div>
-                        {gameOver && (
+                        
+                        {/* GAME OVER SCREEN */}
+                        {gameOverInfo && (
                             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-xl">
                                 <div className="bg-white p-8 rounded-2xl text-center max-w-xs w-full shadow-2xl border-4 border-amber-600 animate-bounce-in">
-                                    <h2 className="text-4xl font-black text-stone-800 mb-2">Hamle Yok!</h2>
-                                    <p className="text-stone-500 mb-6">Oyun Bitti</p>
-                                    <div className="text-6xl font-bold text-amber-600 mb-8">{score}</div>
+                                    <h2 className="text-3xl font-black text-stone-800 mb-2">Hamle Yok!</h2>
+                                    <p className="text-stone-500 mb-4">Oyun Bitti</p>
+                                    
+                                    <div className="bg-stone-100 p-4 rounded-lg mb-4 flex flex-col items-center">
+                                        <p className="text-xs text-stone-400 mb-2 uppercase font-bold">Bu parça sığmadı</p>
+                                        <BlockPiece piece={gameOverInfo.failedPiece} size="sm" className="pointer-events-none opacity-80 scale-75 origin-center" />
+                                    </div>
+
+                                    <div className="text-5xl font-bold text-amber-600 mb-6">{score}</div>
                                     <button onClick={handleRestart} className="w-full bg-amber-600 text-white font-bold py-4 rounded-lg shadow-lg hover:bg-amber-500 active:scale-95 transition-all">Tekrar Oyna</button>
                                 </div>
                             </div>
