@@ -39,8 +39,9 @@
 
         /* Hardware acceleration for moving parts */
         .hardware-accelerated {
-            will-change: transform, top, left;
+            will-change: transform;
             transform: translateZ(0);
+            backface-visibility: hidden;
         }
     </style>
 <script type="importmap">
@@ -500,7 +501,9 @@
             });
 
             const gridRef = React.useRef(null);
-            const animationFrameRef = React.useRef(null);
+            const dragItemRef = React.useRef(null); // Direct DOM reference for performance
+            const lastFrameTime = React.useRef(0); // FPS throttle
+
             const [dragState, setDragState] = React.useState(null);
             const [previewPlacement, setPreviewPlacement] = React.useState(null);
             const [gameOver, setGameOver] = React.useState(false);
@@ -650,14 +653,16 @@
                 if (gridRef.current) gridCellSize = gridRef.current.getBoundingClientRect().width / 9;
 
                 const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
+                const initialX = e.clientX - offsetX;
+                const initialY = e.clientY - offsetY - (isTouch ? 160 : 0);
 
                 setDragState({
                     isDragging: true, pieceIndex: index,
-                    startPos: { x: e.clientX, y: e.clientY },
-                    currentPos: { x: e.clientX, y: e.clientY },
                     dragOffset: { x: offsetX, y: offsetY },
                     gridCellSize,
-                    isTouch
+                    isTouch,
+                    initialX,
+                    initialY
                 });
             }, [currentPieces]);
 
@@ -667,44 +672,49 @@
                 const handlePointerMove = (e) => {
                     e.preventDefault();
                     
-                    // Optimization: Use requestAnimationFrame to throttle updates to screen refresh rate
-                    // This prevents excessive processing on high refresh rate devices (120hz+)
-                    if (animationFrameRef.current) {
-                        cancelAnimationFrame(animationFrameRef.current);
-                    }
+                    // 1. Throttling for stable FPS (approx 60FPS)
+                    // This prevents the loop from running excessively on high refresh rate displays (120Hz+)
+                    const now = performance.now();
+                    const timeSinceLastFrame = now - lastFrameTime.current;
+                    if (timeSinceLastFrame < 16) return; 
+                    lastFrameTime.current = now - (timeSinceLastFrame % 16);
 
-                    animationFrameRef.current = requestAnimationFrame(() => {
-                        setDragState(prev => prev ? { ...prev, currentPos: { x: e.clientX, y: e.clientY } } : null);
+                    // 2. Direct DOM Manipulation
+                    // Bypasses React render cycle for smooth movement
+                    if (dragItemRef.current) {
+                        const x = e.clientX - dragState.dragOffset.x;
+                        const y = e.clientY - dragState.dragOffset.y - (dragState.isTouch ? 160 : 0);
+                        dragItemRef.current.style.transform = `translate(${x}px, ${y}px)`;
+                    }
                         
-                        if (gridRef.current && currentPieces[dragState.pieceIndex]) {
-                            const gridRect = gridRef.current.getBoundingClientRect();
-                            const piece = currentPieces[dragState.pieceIndex];
-                            
-                            const elevation = dragState.isTouch ? 160 : 0; 
-                            const pieceLeft = e.clientX - dragState.dragOffset.x;
-                            const pieceTop = e.clientY - dragState.dragOffset.y - elevation;
-                            
-                            const relativeX = pieceLeft - gridRect.left + (dragState.gridCellSize / 2);
-                            const relativeY = pieceTop - gridRect.top + (dragState.gridCellSize / 2);
-                            const col = Math.floor(relativeX / dragState.gridCellSize);
-                            const row = Math.floor(relativeY / dragState.gridCellSize);
-                            
-                            if (canPlacePiece(grid, piece, row, col)) {
-                                setPreviewPlacement(prev => {
-                                    if (prev && prev.row === row && prev.col === col) return prev;
-                                    return { row, col, shape: piece.shape };
-                                });
-                            } else {
-                                setPreviewPlacement(prev => prev ? null : prev);
-                            }
-                        }
-                    });
+                    // 3. Logic Calculation
+                    if (gridRef.current && currentPieces[dragState.pieceIndex]) {
+                        const gridRect = gridRef.current.getBoundingClientRect();
+                        const piece = currentPieces[dragState.pieceIndex];
+                        
+                        const elevation = dragState.isTouch ? 160 : 0; 
+                        const pieceLeft = e.clientX - dragState.dragOffset.x;
+                        const pieceTop = e.clientY - dragState.dragOffset.y - elevation;
+                        
+                        const relativeX = pieceLeft - gridRect.left + (dragState.gridCellSize / 2);
+                        const relativeY = pieceTop - gridRect.top + (dragState.gridCellSize / 2);
+                        const col = Math.floor(relativeX / dragState.gridCellSize);
+                        const row = Math.floor(relativeY / dragState.gridCellSize);
+                        
+                        // Only trigger React update if the logical grid position changes
+                        setPreviewPlacement(prev => {
+                             if (prev && prev.row === row && prev.col === col) return prev;
+                             if (canPlacePiece(grid, piece, row, col)) {
+                                 return { row, col, shape: piece.shape };
+                             }
+                             return null;
+                        });
+                    }
                 };
 
                 const handlePointerUp = (e) => {
                     e.preventDefault();
-                    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-
+                    
                     if (previewPlacement && dragState && currentPieces[dragState.pieceIndex]) {
                         const piece = currentPieces[dragState.pieceIndex];
                         const { row, col } = previewPlacement;
@@ -743,7 +753,6 @@
                 return () => {
                     window.removeEventListener('pointermove', handlePointerMove);
                     window.removeEventListener('pointerup', handlePointerUp);
-                    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
                 };
             }, [dragState, grid, currentPieces, previewPlacement, canPlacePiece]);
 
@@ -780,10 +789,15 @@
                             ))}
                         </div>
                         {dragState && currentPieces[dragState.pieceIndex] && (
-                            <div className="fixed pointer-events-none z-[9999] hardware-accelerated" style={{ 
-                                left: dragState.currentPos.x - dragState.dragOffset.x, 
-                                top: dragState.currentPos.y - dragState.dragOffset.y - (dragState.isTouch ? 160 : 0) 
-                            }}>
+                            <div 
+                                ref={dragItemRef}
+                                className="fixed pointer-events-none z-[9999] hardware-accelerated" 
+                                style={{ 
+                                    left: 0, 
+                                    top: 0,
+                                    transform: `translate(${dragState.initialX}px, ${dragState.initialY}px)`
+                                }}
+                            >
                                 <BlockPiece piece={currentPieces[dragState.pieceIndex]} customCellSize={dragState.gridCellSize} isSelected={true} />
                             </div>
                         )}
