@@ -10,48 +10,29 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        /* Prevent scrolling when touching the game board on mobile */
-        .no-scroll {
-            touch-action: none;
-        }
-        
-        body {
-            overscroll-behavior: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        /* Wood texture simulation */
+        .no-scroll { touch-action: none; }
+        body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
         .wood-texture {
             background-color: #d4a373;
             background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 4px),
                             repeating-linear-gradient(-45deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 2px, transparent 2px, transparent 4px);
         }
-        
         @keyframes bounceIn {
             0% { transform: scale(0.3); opacity: 0; }
             50% { transform: scale(1.05); opacity: 1; }
             70% { transform: scale(0.9); }
             100% { transform: scale(1); }
         }
-        .animate-bounce-in {
-            animation: bounceIn 0.5s cubic-bezier(0.215, 0.610, 0.355, 1.000) both;
+        .animate-bounce-in { animation: bounceIn 0.5s cubic-bezier(0.215, 0.610, 0.355, 1.000) both; }
+        @keyframes pop {
+            0% { transform: scale(0.5); opacity: 0.5; }
+            60% { transform: scale(1.1); opacity: 1; }
+            80% { transform: scale(0.95); }
+            100% { transform: scale(1); }
         }
-
-        /* Hardware acceleration for moving parts */
-        .hardware-accelerated {
-            will-change: transform;
-            transform: translateZ(0);
-            backface-visibility: hidden;
-        }
-
-        /* Custom CSS Particle for performance */
-        .particle {
-            position: fixed;
-            pointer-events: none;
-            z-index: 9999;
-            border-radius: 2px;
-            will-change: transform, opacity;
-        }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .hardware-accelerated { will-change: transform; transform: translateZ(0); backface-visibility: hidden; }
+        .particle { position: fixed; pointer-events: none; z-index: 9999; border-radius: 2px; will-change: transform, opacity; }
     </style>
 <script type="importmap">
 {
@@ -70,807 +51,354 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- ICONS (SVG) ---
+        // --- ICONS ---
         const Icons = {
-            Trophy: ({ size = 24, className = "" }) => (
-                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-                    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-                    <path d="M4 22h16" />
-                    <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-                    <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-                    <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-                </svg>
-            ),
-            RotateCcw: ({ size = 24, className = "" }) => (
-                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12" />
-                    <path d="M3 3v9h9" />
-                </svg>
-            ),
-            Volume2: ({ size = 24, className = "" }) => (
-                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                </svg>
-            ),
-            VolumeX: ({ size = 24, className = "" }) => (
-                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                    <line x1="23" y1="9" x2="17" y2="15" />
-                    <line x1="17" y1="9" x2="23" y2="15" />
-                </svg>
-            )
+            Trophy: ({ size = 24, className = "" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>,
+            RotateCcw: ({ size = 24, className = "" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12" /><path d="M3 3v9h9" /></svg>,
+            Volume2: ({ size = 24, className = "" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></svg>,
+            VolumeX: ({ size = 24, className = "" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></svg>
         };
 
         // --- CONSTANTS ---
         const GRID_SIZE = 9;
         const PIECE_SHAPES = {
-            SINGLE: [[1]],
-            DOUBLE_H: [[1, 1]],
-            DOUBLE_V: [[1], [1]],
-            TRIPLE_H: [[1, 1, 1]],
-            TRIPLE_V: [[1], [1], [1]],
-            L_SHAPE: [[1, 0], [1, 0], [1, 1]],
-            J_SHAPE: [[0, 1], [0, 1], [1, 1]],
-            SQUARE_2x2: [[1, 1], [1, 1]],
-            SQUARE_3x3: [[1, 1, 1], [1, 1, 1], [1, 1, 1]],
-            T_SHAPE: [[1, 1, 1], [0, 1, 0]]
+            SINGLE: [[1]], DOUBLE_H: [[1, 1]], DOUBLE_V: [[1], [1]], TRIPLE_H: [[1, 1, 1]], TRIPLE_V: [[1], [1], [1]],
+            L_SHAPE: [[1, 0], [1, 0], [1, 1]], J_SHAPE: [[0, 1], [0, 1], [1, 1]], SQUARE_2x2: [[1, 1], [1, 1]], SQUARE_3x3: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], T_SHAPE: [[1, 1, 1], [0, 1, 0]]
         };
-        const PIECE_COLORS = [
-            'bg-amber-600', 'bg-orange-600', 'bg-yellow-700', 'bg-red-800', 'bg-amber-700'
-        ];
+        const PIECE_COLORS = ['bg-amber-600', 'bg-orange-600', 'bg-yellow-700', 'bg-red-800', 'bg-amber-700'];
         const LEVEL_THRESHOLDS = [0, 500, 1500, 3000, 5000, 10000];
 
         const generateRandomPiece = () => {
             const keys = Object.keys(PIECE_SHAPES);
             const randomKey = keys[Math.floor(Math.random() * keys.length)];
-            const color = PIECE_COLORS[Math.floor(Math.random() * PIECE_COLORS.length)];
             return {
                 id: Math.random().toString(36).substr(2, 9),
                 type: randomKey,
                 shape: PIECE_SHAPES[randomKey],
-                color: color
+                color: PIECE_COLORS[Math.floor(Math.random() * PIECE_COLORS.length)]
             };
         };
-
         const createEmptyGrid = () => Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
 
-        // --- PARTICLE SYSTEM (Direct DOM for Performance) ---
+        // --- PARTICLE SYSTEM ---
         const createParticleExplosion = (x, y, color) => {
-            // Limit particles per block to 4 for performance on low-end devices
-            const particleCount = 4; 
-            
+            const particleCount = 3; // Reduced for performance on WebView
             for (let i = 0; i < particleCount; i++) {
                 const el = document.createElement('div');
                 el.className = 'particle';
-                
-                // Randomize size slightly
                 const size = 6 + Math.random() * 6;
-                el.style.width = `${size}px`;
-                el.style.height = `${size}px`;
-                el.style.backgroundColor = color;
-                el.style.left = `${x}px`;
-                el.style.top = `${y}px`;
-                
+                el.style.width = `${size}px`; el.style.height = `${size}px`;
+                el.style.backgroundColor = color; el.style.left = `${x}px`; el.style.top = `${y}px`;
                 document.body.appendChild(el);
-
-                // Random velocities
-                const angle = Math.random() * Math.PI * 2;
-                const velocity = 20 + Math.random() * 30; // px distance
-                const tx = Math.cos(angle) * velocity;
-                const ty = Math.sin(angle) * velocity + 30; // add gravity component to Y
-                const rotation = Math.random() * 360;
-
-                // Web Animations API - optimized for compositor thread
+                const angle = Math.random() * Math.PI * 2, velocity = 20 + Math.random() * 30;
+                const tx = Math.cos(angle) * velocity, ty = Math.sin(angle) * velocity + 30, rotation = Math.random() * 360;
                 const animation = el.animate([
                     { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
                     { transform: `translate(${tx}px, ${ty}px) rotate(${rotation}deg)`, opacity: 0 }
-                ], {
-                    duration: 400 + Math.random() * 200,
-                    easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
-                    fill: 'forwards'
-                });
-
-                animation.onfinish = () => {
-                    el.remove();
-                };
+                ], { duration: 400 + Math.random() * 200, easing: 'cubic-bezier(0.25, 1, 0.5, 1)', fill: 'forwards' });
+                animation.onfinish = () => el.remove();
             }
         };
 
+        // --- AUDIO ---
+        let audioCtx = null; let bgmNodes = []; let nextNoteTime = 0.0; let isBgmPlaying = false; let timerID = null;
+        const NOTES = { 'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'G4': 392.00, 'A4': 440.00 };
+        const SCALE = [NOTES.C4, NOTES.D4, NOTES.E4, NOTES.G4, NOTES.A4];
 
-        // --- AUDIO UTILS ---
-        let audioCtx = null;
-        let bgmNodes = [];
-        let nextNoteTime = 0.0;
-        let isBgmPlaying = false;
-        let timerID = null;
-        let tempo = 60.0;
-        let lookahead = 25.0;
-        let scheduleAheadTime = 0.1;
-        
-        const NOTES = {
-            'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'G4': 392.00, 'A4': 440.00,
-            'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'G5': 783.99
-        };
-        const SCALE = [NOTES.C4, NOTES.D4, NOTES.E4, NOTES.G4, NOTES.A4, NOTES.C5, NOTES.D5, NOTES.E5];
-
-        const getAudioContext = () => {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            return audioCtx;
-        };
-
-        const playComboSound = (comboCount) => {
-            try {
-                if (!isBgmPlaying && !audioCtx) return; 
-                const ctx = getAudioContext();
-                if (ctx.state === 'suspended') ctx.resume();
-                
-                const t = ctx.currentTime;
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                
-                const baseFreq = 300 + (comboCount * 50);
-                
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(baseFreq, t);
-                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, t + 0.3);
-                
-                gain.gain.setValueAtTime(0, t);
-                gain.gain.linearRampToValueAtTime(0.3 + (Math.min(comboCount, 5) * 0.05), t + 0.01);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
-                
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                
-                osc.start(t);
-                osc.stop(t + 0.4);
-
-                if (comboCount > 1) {
-                    const sparkOsc = ctx.createOscillator();
-                    const sparkGain = ctx.createGain();
-                    sparkOsc.type = 'triangle';
-                    sparkOsc.frequency.setValueAtTime(baseFreq * 2, t);
-                    sparkOsc.frequency.linearRampToValueAtTime(baseFreq * 3, t + 0.2);
-                    sparkGain.gain.setValueAtTime(0, t);
-                    sparkGain.gain.linearRampToValueAtTime(0.1, t + 0.05);
-                    sparkGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
-                    sparkOsc.connect(sparkGain);
-                    sparkGain.connect(ctx.destination);
-                    sparkOsc.start(t);
-                    sparkOsc.stop(t + 0.2);
-                }
-            } catch (e) {
-                console.error("SFX error", e);
-            }
-        };
-
-        const playNote = (freq, time, duration) => {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0, time);
-            gain.gain.linearRampToValueAtTime(0.05, time + 0.1);
-            gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start(time);
-            osc.stop(time + duration);
-            bgmNodes.push(osc);
-            bgmNodes.push(gain);
-            setTimeout(() => {
-                const i = bgmNodes.indexOf(osc);
-                if (i > -1) bgmNodes.splice(i, 2);
-            }, (duration + 1) * 1000);
-        };
-
-        let beatCount = 0;
-        const scheduleNote = (time) => {
-            if (beatCount % 4 === 0) playNote(NOTES.C4 / 2, time, 4);
-            if (Math.random() > 0.3) {
-                const note = SCALE[Math.floor(Math.random() * SCALE.length)];
-                playNote(note, time, 1.5);
-            }
-            if (Math.random() > 0.7) {
-                const note = SCALE[Math.floor(Math.random() * SCALE.length)];
-                playNote(note, time + 0.1, 2);
-            }
-            beatCount++;
-        };
-
-        const scheduler = () => {
-            if (!isBgmPlaying || !audioCtx) return;
-            while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
-                scheduleNote(nextNoteTime);
-                nextNoteTime += 60.0 / tempo;
-            }
-            timerID = window.setTimeout(scheduler, lookahead);
-        };
-
-        const startBackgroundMusic = () => {
-            const ctx = getAudioContext();
-            if (isBgmPlaying) return;
-            if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-            isBgmPlaying = true;
-            nextNoteTime = ctx.currentTime;
-            beatCount = 0;
-            scheduler();
-        };
-
-        const stopBackgroundMusic = () => {
-            isBgmPlaying = false;
-            if (timerID) window.clearTimeout(timerID);
-            bgmNodes.forEach((node) => {
-                try { node.stop(); } catch(e) {}
-                try { node.disconnect(); } catch(e) {}
-            });
-            bgmNodes = [];
-        };
+        const getAudioContext = () => { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; };
+        const playPlaceSound = () => { try { if (!isBgmPlaying && !audioCtx) return; const ctx = getAudioContext(); if (ctx.state === 'suspended') ctx.resume(); const t = ctx.currentTime; const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.type = 'triangle'; osc.frequency.setValueAtTime(150, t); osc.frequency.exponentialRampToValueAtTime(40, t + 0.1); gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(0.5, t + 0.01); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1); osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t + 0.1); } catch(e) {} };
+        const playComboSound = (comboCount) => { try { if (!isBgmPlaying && !audioCtx) return; const ctx = getAudioContext(); if (ctx.state === 'suspended') ctx.resume(); const t = ctx.currentTime; const osc = ctx.createOscillator(); const gain = ctx.createGain(); const baseFreq = 300 + (comboCount * 50); osc.type = 'sine'; osc.frequency.setValueAtTime(baseFreq, t); osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, t + 0.3); gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(0.3 + (Math.min(comboCount, 5) * 0.05), t + 0.01); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4); osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t + 0.4); } catch(e) {} };
+        const playNote = (freq, time, duration) => { if (!audioCtx) return; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.value = freq; gain.gain.setValueAtTime(0, time); gain.gain.linearRampToValueAtTime(0.05, time + 0.1); gain.gain.exponentialRampToValueAtTime(0.001, time + duration); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(time); osc.stop(time + duration); bgmNodes.push(osc); bgmNodes.push(gain); setTimeout(() => { const i = bgmNodes.indexOf(osc); if (i > -1) bgmNodes.splice(i, 2); }, (duration + 1) * 1000); };
+        let beatCount = 0; const scheduleNote = (time) => { if (beatCount % 4 === 0) playNote(NOTES.C4 / 2, time, 4); if (Math.random() > 0.3) playNote(SCALE[Math.floor(Math.random() * SCALE.length)], time, 1.5); if (Math.random() > 0.7) playNote(SCALE[Math.floor(Math.random() * SCALE.length)], time + 0.1, 2); beatCount++; };
+        const scheduler = () => { if (!isBgmPlaying || !audioCtx) return; while (nextNoteTime < audioCtx.currentTime + 0.1) { scheduleNote(nextNoteTime); nextNoteTime += 60.0 / 60.0; } timerID = window.setTimeout(scheduler, 25.0); };
+        const startBackgroundMusic = () => { const ctx = getAudioContext(); if (isBgmPlaying) return; if (ctx.state === 'suspended') ctx.resume(); isBgmPlaying = true; nextNoteTime = ctx.currentTime; beatCount = 0; scheduler(); };
+        const stopBackgroundMusic = () => { isBgmPlaying = false; if (timerID) window.clearTimeout(timerID); bgmNodes.forEach((node) => { try { node.stop(); } catch(e) {} try { node.disconnect(); } catch(e) {} }); bgmNodes = []; };
 
         // --- COMPONENTS ---
+        const FPSCounter = () => {
+            const [fps, setFps] = React.useState(0);
+            React.useEffect(() => { let frameCount = 0, lastTime = performance.now(), afId; const loop = () => { const now = performance.now(); frameCount++; if (now - lastTime >= 1000) { setFps(Math.round((frameCount * 1000) / (now - lastTime))); frameCount = 0; lastTime = now; } afId = requestAnimationFrame(loop); }; afId = requestAnimationFrame(loop); return () => cancelAnimationFrame(afId); }, []);
+            return <div className="absolute top-2 right-2 bg-black/50 text-green-400 text-xs font-mono p-1 rounded z-50 pointer-events-none">FPS: {fps}</div>;
+        };
 
         const BlockPiece = React.memo(({ piece, size = 'md', customCellSize, className = '', onInteract, isSelected, style }) => {
             const cellSize = customCellSize || (size === 'sm' ? 12 : size === 'md' ? 20 : 32);
-            const gap = 1;
-            const rows = piece.shape.length;
-            const cols = piece.shape[0].length;
-
+            const gap = 1; const rows = piece.shape.length; const cols = piece.shape[0].length;
             return (
-                <div 
-                    className={`relative inline-block select-none touch-none transition-transform duration-75 ${isSelected ? 'brightness-110 drop-shadow-2xl z-50 hardware-accelerated' : ''} ${className}`}
-                    style={{ 
-                        width: cols * cellSize + (cols - 1) * gap, 
-                        height: rows * cellSize + (rows - 1) * gap,
-                        ...style
-                    }}
-                    onPointerDown={onInteract}
-                >
-                    {piece.shape.map((row, rowIndex) => (
-                        row.map((cell, colIndex) => {
-                            if (cell === 0) return null;
-                            return (
-                                <div
-                                    key={`${rowIndex}-${colIndex}`}
-                                    className={`absolute rounded-sm border-white/20 border-t border-l shadow-sm ${piece.color}`}
-                                    style={{
-                                        width: cellSize,
-                                        height: cellSize,
-                                        top: rowIndex * (cellSize + gap),
-                                        left: colIndex * (cellSize + gap),
-                                        boxShadow: 'inset -2px -2px 2px rgba(0,0,0,0.2), 2px 2px 4px rgba(0,0,0,0.3)'
-                                    }}
-                                />
-                            );
-                        })
-                    ))}
+                <div className={`relative inline-block select-none touch-none transition-transform duration-75 ${isSelected ? 'brightness-110 drop-shadow-2xl z-50 hardware-accelerated' : ''} ${className}`} style={{ width: cols * cellSize + (cols - 1) * gap, height: rows * cellSize + (rows - 1) * gap, ...style }} onPointerDown={onInteract}>
+                    {piece.shape.map((row, r) => row.map((cell, c) => {
+                        if (cell === 0) return null;
+                        return <div key={`${r}-${c}`} className={`absolute rounded-sm border-white/20 border-t border-l shadow-sm ${piece.color}`} style={{ width: cellSize, height: cellSize, top: r * (cellSize + gap), left: c * (cellSize + gap), boxShadow: 'inset -2px -2px 2px rgba(0,0,0,0.2), 2px 2px 4px rgba(0,0,0,0.3)' }} />;
+                    }))}
                 </div>
             );
         });
 
-        const GridBoard = React.memo(React.forwardRef(({ grid, onCellClick, previewPlacement, clearingCells }, ref) => {
-            const isSubgridAlt = (r, c) => {
-                const boxRow = Math.floor(r / 3);
-                const boxCol = Math.floor(c / 3);
-                return (boxRow + boxCol) % 2 !== 0;
-            };
-
+        const GridBoard = React.memo(React.forwardRef(({ grid, onCellClick }, ref) => {
+            const domRef = React.useRef(null);
+            const cellRefs = React.useRef({});
+            React.useImperativeHandle(ref, () => ({
+                getBoundingClientRect: () => domRef.current?.getBoundingClientRect(),
+                highlightCells: (positions) => {
+                    Object.values(cellRefs.current).forEach(el => el && el.classList.remove('bg-amber-500/50'));
+                    if (positions) positions.forEach(({r, c}) => { const el = cellRefs.current[`${r}-${c}`]; if (el && !el.classList.contains('filled')) el.classList.add('bg-amber-500/50'); });
+                }
+            }));
+            const isSubgridAlt = (r, c) => (Math.floor(r / 3) + Math.floor(c / 3)) % 2 !== 0;
             return (
-                <div ref={ref} className="relative p-1 sm:p-2 bg-[#5d4037] rounded-lg shadow-2xl border-4 border-[#3e2723] touch-none select-none hardware-accelerated">
+                <div ref={domRef} className="relative p-1 sm:p-2 bg-[#5d4037] rounded-lg shadow-2xl border-4 border-[#3e2723] touch-none select-none hardware-accelerated">
                     <div className="grid grid-rows-9 gap-[2px]">
-                        {grid.map((row, rIndex) => (
-                            <div key={rIndex} className="grid grid-cols-9 gap-[2px]">
-                                {row.map((cell, cIndex) => {
-                                    const isFilled = cell === 1;
-                                    let isPreview = false;
-                                    if (previewPlacement) {
-                                        const rRel = rIndex - previewPlacement.row;
-                                        const cRel = cIndex - previewPlacement.col;
-                                        if (rRel >= 0 && rRel < previewPlacement.shape.length && cRel >= 0 && cRel < previewPlacement.shape[0].length && previewPlacement.shape[rRel][cRel] === 1) {
-                                            isPreview = true;
-                                        }
-                                    }
-                                    
-                                    const isClearingHint = clearingCells && clearingCells.has(`${rIndex}-${cIndex}`);
-
-                                    return (
-                                        <div
-                                            key={`${rIndex}-${cIndex}`}
-                                            data-row={rIndex}
-                                            data-col={cIndex}
-                                            onClick={() => onCellClick && onCellClick(rIndex, cIndex)}
-                                            className={`
-                                                w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-sm transition-colors duration-150
-                                                flex items-center justify-center overflow-hidden relative
-                                                ${isFilled ? 'bg-amber-600 shadow-[inset_-2px_-2px_2px_rgba(0,0,0,0.3)] border-t border-white/20' : isSubgridAlt(rIndex, cIndex) ? 'bg-[#4e342e]/80' : 'bg-[#3e2723]/60'}
-                                                ${isPreview && !isFilled ? 'bg-amber-500/50' : ''}
-                                                ${isClearingHint ? 'bg-white/40 animate-pulse z-10 shadow-[0_0_10px_rgba(255,255,255,0.5)]' : ''}
-                                            `}
-                                        >
-                                            {isFilled && (
-                                                <div className="absolute inset-0 opacity-20" style={{
-                                                    backgroundImage: `linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%, transparent 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1) 75%, transparent 75%, transparent), linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%, transparent 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1) 75%, transparent 75%, transparent)`,
-                                                    backgroundSize: '4px 4px'
-                                                }} />
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ))}
+                        {grid.map((row, r) => <div key={r} className="grid grid-cols-9 gap-[2px]">
+                            {row.map((cell, c) => {
+                                const isFilled = cell === 1;
+                                return (
+                                    <div key={`${r}-${c}`} ref={el => cellRefs.current[`${r}-${c}`] = el} onClick={() => onCellClick && onCellClick(r, c)} className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-sm transition-colors duration-150 flex items-center justify-center overflow-hidden relative ${isFilled ? 'filled bg-amber-600 shadow-[inset_-2px_-2px_2px_rgba(0,0,0,0.3)] border-t border-white/20 animate-pop' : isSubgridAlt(r, c) ? 'bg-[#4e342e]/80' : 'bg-[#3e2723]/60'}`}>
+                                        {isFilled && <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%, transparent 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1) 75%, transparent 75%, transparent), linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%, transparent 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1) 75%, transparent 75%, transparent)`, backgroundSize: '4px 4px' }} />}
+                                    </div>
+                                );
+                            })}
+                        </div>)}
                     </div>
                 </div>
             );
-        }), (prevProps, nextProps) => {
-            if (prevProps.grid !== nextProps.grid) return false;
-            if (prevProps.clearingCells !== nextProps.clearingCells) return false; 
-            if (prevProps.previewPlacement === null && nextProps.previewPlacement === null) return true;
-            if (prevProps.previewPlacement && nextProps.previewPlacement) {
-                return prevProps.previewPlacement.row === nextProps.previewPlacement.row && 
-                       prevProps.previewPlacement.col === nextProps.previewPlacement.col;
-            }
-            return false;
-        });
+        }), (prev, next) => prev.grid === next.grid);
 
-        const GameControls = React.memo(({ score, level, highScore, onReset, isMusicOn, onToggleMusic }) => {
-            return (
-                <div className="w-full max-w-md mx-auto mb-4 flex flex-col gap-4">
-                    <div className="flex justify-between items-center bg-[#3e2723] p-4 rounded-xl border-b-4 border-[#271815] shadow-lg">
-                        <div className="flex flex-col">
-                            <span className="text-[#a1887f] text-xs font-bold tracking-wider uppercase">Seviye</span>
-                            <span className="text-2xl font-bold text-amber-400">{level}</span>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <span className="text-[#a1887f] text-xs font-bold tracking-wider uppercase">Puan</span>
-                            <span className="text-3xl font-black text-white tracking-widest">{score}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-[#a1887f] text-xs font-bold tracking-wider uppercase flex items-center gap-1">
-                                <Icons.Trophy size={10} /> Rekor
-                            </span>
-                            <span className="text-xl font-bold text-orange-200">{highScore}</span>
-                        </div>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                        <button onClick={onReset} className="flex-1 bg-stone-700 hover:bg-stone-600 active:translate-y-1 border-b-4 border-stone-900 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all">
-                            <Icons.RotateCcw size={18} />
-                            <span className="hidden sm:inline">Yenile</span>
-                        </button>
-                        <button onClick={onToggleMusic} className={`flex-1 ${isMusicOn ? 'bg-green-700 hover:bg-green-600 border-green-900' : 'bg-red-700 hover:bg-red-600 border-red-900'} active:translate-y-1 border-b-4 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all`}>
-                            {isMusicOn ? <Icons.Volume2 size={18} /> : <Icons.VolumeX size={18} />}
-                            <span className="hidden sm:inline">{isMusicOn ? 'Müzik Açık' : 'Müzik Kapalı'}</span>
-                        </button>
-                    </div>
+        const GameControls = React.memo(({ score, level, highScore, onReset, isMusicOn, onToggleMusic }) => (
+            <div className="w-full max-w-md mx-auto mb-4 flex flex-col gap-4">
+                <div className="flex justify-between items-center bg-[#3e2723] p-4 rounded-xl border-b-4 border-[#271815] shadow-lg">
+                    <div className="flex flex-col"><span className="text-[#a1887f] text-xs font-bold tracking-wider uppercase">Seviye</span><span className="text-2xl font-bold text-amber-400">{level}</span></div>
+                    <div className="flex flex-col items-center"><span className="text-[#a1887f] text-xs font-bold tracking-wider uppercase">Puan</span><span className="text-3xl font-black text-white tracking-widest">{score}</span></div>
+                    <div className="flex flex-col items-end"><span className="text-[#a1887f] text-xs font-bold tracking-wider uppercase flex items-center gap-1"><Icons.Trophy size={10} /> Rekor</span><span className="text-xl font-bold text-orange-200">{highScore}</span></div>
                 </div>
-            );
-        });
-
-        // Storage Keys
-        const STORAGE_KEY_GAME = 'woodblock_gamestate';
-        const STORAGE_KEY_MUSIC = 'woodblock_music';
+                <div className="flex justify-between gap-2">
+                    <button onClick={onReset} className="flex-1 bg-stone-700 hover:bg-stone-600 active:translate-y-1 border-b-4 border-stone-900 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"><Icons.RotateCcw size={18} /><span className="hidden sm:inline">Yenile</span></button>
+                    <button onClick={onToggleMusic} className={`flex-1 ${isMusicOn ? 'bg-green-700 hover:bg-green-600 border-green-900' : 'bg-red-700 hover:bg-red-600 border-red-900'} active:translate-y-1 border-b-4 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all`}>{isMusicOn ? <Icons.Volume2 size={18} /> : <Icons.VolumeX size={18} />}<span className="hidden sm:inline">{isMusicOn ? 'Müzik Açık' : 'Müzik Kapalı'}</span></button>
+                </div>
+            </div>
+        ));
 
         const App = () => {
-            const getInitialGameState = () => {
-                try {
-                    const saved = localStorage.getItem(STORAGE_KEY_GAME);
-                    if (saved) {
-                        const parsed = JSON.parse(saved);
-                        if (!parsed.gameOver) return parsed;
-                    }
-                } catch(e) {
-                    console.error("Failed to load game state", e);
-                }
-                return null;
-            };
-
-            const savedGame = getInitialGameState();
-
-            const [grid, setGrid] = React.useState(savedGame ? savedGame.grid : createEmptyGrid());
-            const [currentPieces, setCurrentPieces] = React.useState(savedGame ? savedGame.currentPieces : [generateRandomPiece(), generateRandomPiece(), generateRandomPiece()]);
-            const [score, setScore] = React.useState(savedGame ? savedGame.score : 0);
-            const [level, setLevel] = React.useState(savedGame ? savedGame.level : 1);
-            const [highScore, setHighScore] = React.useState(() => {
-                const saved = localStorage.getItem('woodblock_highscore');
-                return saved ? parseInt(saved, 10) : 0;
-            });
+            const [grid, setGrid] = React.useState(createEmptyGrid());
+            const [currentPieces, setCurrentPieces] = React.useState([generateRandomPiece(), generateRandomPiece(), generateRandomPiece()]);
+            const [score, setScore] = React.useState(0);
+            const [level, setLevel] = React.useState(1);
+            const [highScore, setHighScore] = React.useState(() => parseInt(localStorage.getItem('woodblock_highscore') || '0'));
+            const [isMusicOn, setIsMusicOn] = React.useState(false);
+            const [gameOverInfo, setGameOverInfo] = React.useState(null);
             
-            const [isMusicOn, setIsMusicOn] = React.useState(() => {
-                const saved = localStorage.getItem(STORAGE_KEY_MUSIC);
-                return saved !== null ? JSON.parse(saved) : true; 
-            });
-
             const gridRef = React.useRef(null);
-            const dragItemRef = React.useRef(null); 
-            const lastFrameTime = React.useRef(0); 
-
-            const [dragState, setDragState] = React.useState(null);
-            const [previewPlacement, setPreviewPlacement] = React.useState(null);
-            const [clearingCells, setClearingCells] = React.useState(null); 
+            const dragItemRef = React.useRef(null);
+            const pointerPosRef = React.useRef({ x: 0, y: 0 });
+            const previewRef = React.useRef(null);
             
-            // Game Over Info
-            const [gameOverInfo, setGameOverInfo] = React.useState(null); 
+            const [dragState, setDragState] = React.useState(null);
 
             React.useEffect(() => {
-                if (!gameOverInfo) {
-                    const stateToSave = {
-                        grid,
-                        currentPieces,
-                        score,
-                        level,
-                        gameOver: false
-                    };
-                    localStorage.setItem(STORAGE_KEY_GAME, JSON.stringify(stateToSave));
-                } else {
-                    localStorage.removeItem(STORAGE_KEY_GAME);
+                const savedGame = localStorage.getItem('woodblock_gamestate');
+                if(savedGame) {
+                    const parsed = JSON.parse(savedGame);
+                    if(!parsed.gameOver) { setGrid(parsed.grid); setCurrentPieces(parsed.currentPieces); setScore(parsed.score); setLevel(parsed.level); }
                 }
+                setIsMusicOn(JSON.parse(localStorage.getItem('woodblock_music') || 'true'));
+            }, []);
+
+            React.useEffect(() => {
+                if(!gameOverInfo) localStorage.setItem('woodblock_gamestate', JSON.stringify({ grid, currentPieces, score, level, gameOver: false }));
+                else localStorage.removeItem('woodblock_gamestate');
             }, [grid, currentPieces, score, level, gameOverInfo]);
 
             React.useEffect(() => {
-                localStorage.setItem(STORAGE_KEY_MUSIC, JSON.stringify(isMusicOn));
-                if (isMusicOn) {
-                    const ctx = getAudioContext();
-                    if (ctx.state === 'suspended') {
-                        const resumeAudio = () => {
-                            ctx.resume().then(() => {
-                                startBackgroundMusic();
-                                window.removeEventListener('click', resumeAudio);
-                                window.removeEventListener('touchstart', resumeAudio);
-                            });
-                        };
-                        window.addEventListener('click', resumeAudio);
-                        window.addEventListener('touchstart', resumeAudio);
-                    } else {
-                        startBackgroundMusic();
-                    }
-                } else {
-                    stopBackgroundMusic();
-                }
+                localStorage.setItem('woodblock_music', JSON.stringify(isMusicOn));
+                if (isMusicOn) startBackgroundMusic(); else stopBackgroundMusic();
             }, [isMusicOn]);
 
-            const toggleMusic = React.useCallback(() => {
-                setIsMusicOn(prev => !prev);
-            }, []);
-
-            const canPlacePiece = React.useCallback((board, piece, row, col) => {
-                const shape = piece.shape;
-                const rLen = shape.length;
-                const cLen = shape[0].length;
-                if (row < 0 || col < 0 || row + rLen > GRID_SIZE || col + cLen > GRID_SIZE) return false;
-                for (let r = 0; r < rLen; r++) {
-                    for (let c = 0; c < cLen; c++) {
-                        if (shape[r][c] === 1 && board[row + r][col + c] === 1) return false;
-                    }
-                }
+            const canPlace = React.useCallback((board, piece, row, col) => {
+                if (row < 0 || col < 0 || row + piece.shape.length > GRID_SIZE || col + piece.shape[0].length > GRID_SIZE) return false;
+                for(let r=0; r<piece.shape.length; r++) for(let c=0; c<piece.shape[0].length; c++) if(piece.shape[r][c] && board[row+r][col+c]) return false;
                 return true;
             }, []);
 
-            const predictMatches = React.useCallback((board, piece, row, col) => {
-                const tempBoard = board.map(r => [...r]);
-                for (let r = 0; r < piece.shape.length; r++) {
-                    for (let c = 0; c < piece.shape[0].length; c++) {
-                        if (piece.shape[r][c] === 1) {
-                             if (row + r < GRID_SIZE && col + c < GRID_SIZE) {
-                                tempBoard[row + r][col + c] = 1;
-                             }
-                        }
-                    }
-                }
-
-                const clearing = new Set();
-                for (let r = 0; r < GRID_SIZE; r++) {
-                    if (tempBoard[r].every(cell => cell === 1)) {
-                        for(let c = 0; c < GRID_SIZE; c++) clearing.add(`${r}-${c}`);
-                    }
-                }
-                for (let c = 0; c < GRID_SIZE; c++) {
-                    if (tempBoard.every(row => row[c] === 1)) {
-                        for(let r = 0; r < GRID_SIZE; r++) clearing.add(`${r}-${c}`);
-                    }
-                }
-                for (let br = 0; br < 9; br += 3) {
-                    for (let bc = 0; bc < 9; bc += 3) {
-                        let full = true;
-                        for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) if (tempBoard[br + r][bc + c] === 0) { full = false; break; }
-                        if (full) {
-                            for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) clearing.add(`${br + r}-${bc + c}`);
-                        }
-                    }
-                }
-                return clearing.size > 0 ? clearing : null;
-            }, []);
-
             const checkMatches = (board) => {
-                let newScore = 0;
-                const rowsToClear = [];
-                const colsToClear = [];
-                const boxesToClear = [];
-
-                for (let r = 0; r < GRID_SIZE; r++) if (board[r].every(cell => cell === 1)) rowsToClear.push(r);
-                for (let c = 0; c < GRID_SIZE; c++) {
-                    let full = true;
-                    for (let r = 0; r < GRID_SIZE; r++) if (board[r][c] === 0) { full = false; break; }
-                    if (full) colsToClear.push(c);
+                let lines = 0, newGrid = board.map(r => [...r]), rows = [], cols = [], boxes = [];
+                for(let r=0; r<9; r++) if(board[r].every(c=>c===1)) rows.push(r);
+                for(let c=0; c<9; c++) if(board.every(r=>r[c]===1)) cols.push(c);
+                for(let br=0; br<9; br+=3) for(let bc=0; bc<9; bc+=3) {
+                    let full=true; for(let r=0; r<3; r++) for(let c=0; c<3; c++) if(board[br+r][bc+c]===0) full=false;
+                    if(full) boxes.push({r:br, c:bc});
                 }
-                for (let br = 0; br < 9; br += 3) {
-                    for (let bc = 0; bc < 9; bc += 3) {
-                        let full = true;
-                        for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) if (board[br + r][bc + c] === 0) { full = false; break; }
-                        if (full) boxesToClear.push({ r: br, c: bc });
-                    }
-                }
-
-                const lines = rowsToClear.length + colsToClear.length + boxesToClear.length;
-                if (lines > 0) {
+                lines = rows.length + cols.length + boxes.length;
+                if(lines > 0) {
                     playComboSound(lines);
-                    const gridRect = gridRef.current?.getBoundingClientRect();
-                    
-                    const clearedCells = new Set();
-                    rowsToClear.forEach(r => { for(let c=0; c<9; c++) clearedCells.add(`${r}-${c}`); });
-                    colsToClear.forEach(c => { for(let r=0; r<9; r++) clearedCells.add(`${r}-${c}`); });
-                    boxesToClear.forEach(b => {
-                        for(let r=0; r<3; r++) for(let c=0; c<3; c++) clearedCells.add(`${b.r+r}-${b.c+c}`);
-                    });
-
-                    if (gridRect) {
-                        const cellSize = gridRect.width / 9;
-                        const getCenter = (r, c) => ({ x: gridRect.left + (c * cellSize) + (cellSize / 2), y: gridRect.top + (r * cellSize) + (cellSize / 2) });
-                        
-                        // Trigger High-Performance DOM Animations
-                        clearedCells.forEach(key => {
-                            const [r, c] = key.split('-').map(Number);
-                            const pos = getCenter(r, c);
-                            createParticleExplosion(pos.x, pos.y, '#f59e0b');
-                        });
+                    const rect = gridRef.current?.getBoundingClientRect();
+                    if(rect) {
+                        const cs = rect.width/9;
+                        const center = (r, c) => ({x: rect.left + c*cs + cs/2, y: rect.top + r*cs + cs/2});
+                        rows.forEach(r => { for(let c=0; c<9; c++) createParticleExplosion(center(r,c).x, center(r,c).y, '#f59e0b'); });
+                        cols.forEach(c => { for(let r=0; r<9; r++) createParticleExplosion(center(r,c).x, center(r,c).y, '#f59e0b'); });
+                        boxes.forEach(b => { for(let r=0; r<3; r++) for(let c=0; c<3; c++) createParticleExplosion(center(b.r+r,b.c+c).x, center(b.r+r,b.c+c).y, '#f59e0b'); });
                     }
-
-                    const comboMultiplier = lines === 1 ? 1 : lines === 2 ? 3 : lines === 3 ? 6 : 10;
-                    newScore += 100 * comboMultiplier;
-
-                    const newGrid = board.map(row => [...row]);
-                    rowsToClear.forEach(r => { for(let c=0; c<GRID_SIZE; c++) newGrid[r][c] = 0; });
-                    colsToClear.forEach(c => { for(let r=0; r<GRID_SIZE; r++) newGrid[r][c] = 0; });
-                    boxesToClear.forEach(box => { for(let r=0; r<3; r++) for(let c=0; c<3; c++) newGrid[box.r + r][box.c + c] = 0; });
-                    
+                    const mult = lines===1?1:lines===2?3:lines===3?6:10;
+                    setScore(s => { const ns = s + 100*mult; if(ns > highScore) { setHighScore(ns); localStorage.setItem('woodblock_highscore', ns); } return ns; });
+                    rows.forEach(r => newGrid[r].fill(0));
+                    cols.forEach(c => newGrid.forEach(r => r[c] = 0));
+                    boxes.forEach(b => { for(let r=0; r<3; r++) for(let c=0; c<3; c++) newGrid[b.r+r][b.c+c] = 0; });
                     setGrid(newGrid);
-                    addScore(newScore);
                 }
-            };
-
-            const addScore = (points) => {
-                setScore(prev => {
-                    const newScore = prev + points;
-                    if (newScore > highScore) {
-                        setHighScore(newScore);
-                        localStorage.setItem('woodblock_highscore', newScore.toString());
-                    }
-                    let newLevel = 1;
-                    for (let i = 0; i < LEVEL_THRESHOLDS.length; i++) {
-                        if (newScore >= LEVEL_THRESHOLDS[i]) newLevel = i + 1;
-                    }
-                    setLevel(newLevel);
-                    return newScore;
-                });
             };
 
             const checkGameOver = (board, pieces) => {
-                const available = pieces.filter(p => p !== null);
-                if (available.length === 0) return null;
-                
-                // Check if any piece can be placed
-                for (const piece of available) {
-                    for (let r = 0; r < GRID_SIZE; r++) {
-                        for (let c = 0; c < GRID_SIZE; c++) {
-                            if (canPlacePiece(board, piece, r, c)) return null; // Game continues
-                        }
-                    }
-                }
-                
-                // If we are here, NO piece can be placed. Find the first one that failed as the reason.
-                return {
-                    failedPiece: available[0],
-                    message: "Bu parça sığmıyor!"
-                };
+                const avail = pieces.filter(p => p);
+                if(avail.length === 0) return null;
+                for(const p of avail) for(let r=0; r<9; r++) for(let c=0; c<9; c++) if(canPlace(board, p, r, c)) return null;
+                return { failedPiece: avail[0], message: "Bu parça sığmıyor!" };
             };
 
-            const handlePointerDown = React.useCallback((e, index) => {
-                if (!currentPieces[index]) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const target = e.currentTarget;
-                const rect = target.getBoundingClientRect();
-                const offsetX = e.clientX - rect.left;
-                const offsetY = e.clientY - rect.top;
-                let gridCellSize = 32;
-                if (gridRef.current) gridCellSize = gridRef.current.getBoundingClientRect().width / 9;
-
+            const handlePointerDown = (e, index) => {
+                if(!currentPieces[index]) return;
+                e.preventDefault(); e.stopPropagation();
+                const rect = e.currentTarget.getBoundingClientRect();
                 const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
-                const initialX = e.clientX - offsetX;
-                const initialY = e.clientY - offsetY - (isTouch ? 160 : 0);
+                
+                // Sync initial position
+                pointerPosRef.current = { x: e.clientX, y: e.clientY };
 
-                setDragState({
-                    isDragging: true, pieceIndex: index,
-                    dragOffset: { x: offsetX, y: offsetY },
-                    gridCellSize,
-                    isTouch,
-                    initialX,
-                    initialY
+                setDragState({ 
+                    isDragging: true, pieceIndex: index, 
+                    initialX: e.clientX - (e.clientX - rect.left), 
+                    initialY: e.clientY - (e.clientY - rect.top) - (isTouch?160:0),
+                    dragOffset: { x: e.clientX - rect.left, y: e.clientY - rect.top },
+                    gridCellSize: gridRef.current?.getBoundingClientRect().width / 9 || 32,
+                    isTouch
                 });
-            }, [currentPieces]);
+            };
 
+            // Render Loop (60 FPS Cap)
             React.useEffect(() => {
-                if (!dragState) return;
+                if(!dragState) return;
+                let afId;
+                let lastTime = performance.now();
+                const TARGET_FPS = 60;
+                const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
-                const handlePointerMove = (e) => {
-                    e.preventDefault();
-                    
-                    const now = performance.now();
-                    const timeSinceLastFrame = now - lastFrameTime.current;
-                    if (timeSinceLastFrame < 16) return; 
-                    lastFrameTime.current = now - (timeSinceLastFrame % 16);
-
-                    if (dragItemRef.current) {
-                        const x = e.clientX - dragState.dragOffset.x;
-                        const y = e.clientY - dragState.dragOffset.y - (dragState.isTouch ? 160 : 0);
-                        dragItemRef.current.style.transform = `translate(${x}px, ${y}px)`;
-                    }
+                const loop = (time) => {
+                    const delta = time - lastTime;
+                    if (delta >= FRAME_INTERVAL) {
+                        lastTime = time - (delta % FRAME_INTERVAL);
+                        const { x: clientX, y: clientY } = pointerPosRef.current;
                         
-                    if (gridRef.current && currentPieces[dragState.pieceIndex]) {
-                        const gridRect = gridRef.current.getBoundingClientRect();
-                        const piece = currentPieces[dragState.pieceIndex];
-                        
-                        const elevation = dragState.isTouch ? 160 : 0; 
-                        const pieceLeft = e.clientX - dragState.dragOffset.x;
-                        const pieceTop = e.clientY - dragState.dragOffset.y - elevation;
-                        
-                        const relativeX = pieceLeft - gridRect.left + (dragState.gridCellSize / 2);
-                        const relativeY = pieceTop - gridRect.top + (dragState.gridCellSize / 2);
-                        const col = Math.floor(relativeX / dragState.gridCellSize);
-                        const row = Math.floor(relativeY / dragState.gridCellSize);
-                        
-                        if (canPlacePiece(grid, piece, row, col)) {
-                             setPreviewPlacement(prev => {
-                                 if (prev && prev.row === row && prev.col === col) return prev;
-                                 return { row, col, shape: piece.shape };
-                             });
-                             
-                             const predictedClears = predictMatches(grid, piece, row, col);
-                             setClearingCells(prev => {
-                                 if (!prev && !predictedClears) return null;
-                                 if (prev && predictedClears && prev.size === predictedClears.size) {
-                                     let same = true;
-                                     for(let k of predictedClears) if(!prev.has(k)) { same=false; break; }
-                                     if(same) return prev;
-                                 }
-                                 return predictedClears;
-                             });
-
-                        } else {
-                             setPreviewPlacement(null);
-                             setClearingCells(null);
+                        // 1. Move Drag Item
+                        if(dragItemRef.current) {
+                            const yOff = dragState.isTouch ? 160 : 0;
+                            dragItemRef.current.style.transform = `translate(${clientX - dragState.dragOffset.x}px, ${clientY - dragState.dragOffset.y - yOff}px)`;
                         }
-                    }
-                };
 
-                const handlePointerUp = (e) => {
-                    e.preventDefault();
-                    
-                    if (previewPlacement && dragState && currentPieces[dragState.pieceIndex]) {
-                        const piece = currentPieces[dragState.pieceIndex];
-                        const { row, col } = previewPlacement;
-                        const newGrid = grid.map(r => [...r]);
-                        let blocksPlaced = 0;
-                        for (let r = 0; r < piece.shape.length; r++) {
-                            for (let c = 0; c < piece.shape[0].length; c++) {
-                                if (piece.shape[r][c] === 1) {
-                                    newGrid[row + r][col + c] = 1;
-                                    blocksPlaced++;
-                                }
+                        // 2. Grid Highlight
+                        if(gridRef.current && currentPieces[dragState.pieceIndex]) {
+                            const rect = gridRef.current.getBoundingClientRect();
+                            const p = currentPieces[dragState.pieceIndex];
+                            const yOff = dragState.isTouch ? 160 : 0;
+                            const cx = (clientX - dragState.dragOffset.x) - rect.left + dragState.gridCellSize/2;
+                            const cy = (clientY - dragState.dragOffset.y - yOff) - rect.top + dragState.gridCellSize/2;
+                            const c = Math.floor(cx / dragState.gridCellSize);
+                            const r = Math.floor(cy / dragState.gridCellSize);
+                            
+                            if(canPlace(grid, p, r, c)) {
+                                previewRef.current = {row: r, col: c};
+                                const pos = [];
+                                for(let pr=0; pr<p.shape.length; pr++) for(let pc=0; pc<p.shape[0].length; pc++) if(p.shape[pr][pc]) pos.push({r:r+pr, c:c+pc});
+                                gridRef.current.highlightCells(pos);
+                            } else {
+                                previewRef.current = null;
+                                gridRef.current.highlightCells(null);
                             }
                         }
-                        setGrid(newGrid);
-                        addScore(blocksPlaced * 10);
-                        const newPieces = [...currentPieces];
-                        newPieces[dragState.pieceIndex] = null;
-                        setCurrentPieces(newPieces);
-                        
-                        // This triggers the DOM animations synchronously
-                        checkMatches(newGrid);
+                    }
+                    afId = requestAnimationFrame(loop);
+                };
+                afId = requestAnimationFrame(loop);
+                return () => cancelAnimationFrame(afId);
+            }, [dragState, grid, currentPieces, canPlace]);
 
-                        if (newPieces.every(p => p === null)) {
+            // Input Listener
+            React.useEffect(() => {
+                if(!dragState) return;
+                const move = (e) => { e.preventDefault(); pointerPosRef.current = { x: e.clientX, y: e.clientY }; };
+                const up = (e) => {
+                    e.preventDefault();
+                    
+                    // Re-calculate placement using EXACT pointer position (in case frame was skipped)
+                    let finalPlacement = previewRef.current;
+                    if(gridRef.current && currentPieces[dragState.pieceIndex]) {
+                         const rect = gridRef.current.getBoundingClientRect();
+                         const p = currentPieces[dragState.pieceIndex];
+                         const yOff = dragState.isTouch ? 160 : 0;
+                         const cx = (e.clientX - dragState.dragOffset.x) - rect.left + dragState.gridCellSize/2;
+                         const cy = (e.clientY - dragState.dragOffset.y - yOff) - rect.top + dragState.gridCellSize/2;
+                         const c = Math.floor(cx / dragState.gridCellSize);
+                         const r = Math.floor(cy / dragState.gridCellSize);
+                         if(canPlace(grid, p, r, c)) finalPlacement = {row: r, col: c};
+                         else finalPlacement = null;
+                    }
+
+                    if(finalPlacement) {
+                        const {row, col} = finalPlacement;
+                        const p = currentPieces[dragState.pieceIndex];
+                        const ng = grid.map(r=>[...r]);
+                        let placed = 0;
+                        for(let r=0; r<p.shape.length; r++) for(let c=0; c<p.shape[0].length; c++) if(p.shape[r][c]) { ng[row+r][col+c] = 1; placed++; }
+                        setGrid(ng);
+                        setScore(s => s + placed*10);
+                        playPlaceSound();
+                        const np = [...currentPieces]; np[dragState.pieceIndex] = null;
+                        setCurrentPieces(np);
+                        checkMatches(ng);
+                        if(np.every(x=>x===null)) {
                             setTimeout(() => {
-                                const nextPieces = [generateRandomPiece(), generateRandomPiece(), generateRandomPiece()];
-                                setCurrentPieces(nextPieces);
-                                const lost = checkGameOver(newGrid, nextPieces);
-                                if (lost) setGameOverInfo(lost);
+                                const next = [generateRandomPiece(), generateRandomPiece(), generateRandomPiece()];
+                                setCurrentPieces(next);
+                                const lost = checkGameOver(ng, next);
+                                if(lost) setGameOverInfo(lost);
                             }, 200);
                         } else {
-                            const lost = checkGameOver(newGrid, newPieces);
-                            if (lost) setGameOverInfo(lost);
+                            const lost = checkGameOver(ng, np);
+                            if(lost) setGameOverInfo(lost);
                         }
                     }
-                    setDragState(null);
-                    setPreviewPlacement(null);
-                    setClearingCells(null);
+                    setDragState(null); previewRef.current = null; gridRef.current?.highlightCells(null);
                 };
-
-                window.addEventListener('pointermove', handlePointerMove, { passive: false });
-                window.addEventListener('pointerup', handlePointerUp);
-                return () => {
-                    window.removeEventListener('pointermove', handlePointerMove);
-                    window.removeEventListener('pointerup', handlePointerUp);
-                };
-            }, [dragState, grid, currentPieces, previewPlacement, canPlacePiece, predictMatches]);
-
-            const handleRestart = React.useCallback(() => {
-                localStorage.removeItem(STORAGE_KEY_GAME);
-                setGrid(createEmptyGrid());
-                setCurrentPieces([generateRandomPiece(), generateRandomPiece(), generateRandomPiece()]);
-                setScore(0);
-                setLevel(1);
-                setGameOverInfo(null);
-                setDragState(null);
-                setClearingCells(null);
-            }, []);
+                window.addEventListener('pointermove', move, {passive: false});
+                window.addEventListener('pointerup', up);
+                return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+            }, [dragState, grid, currentPieces, canPlace]);
 
             return (
                 <div className="min-h-screen wood-texture flex items-center justify-center p-4 selection:bg-transparent overflow-hidden">
+                    <FPSCounter />
                     <div className="max-w-lg w-full flex flex-col items-center relative">
-                        <h1 className="text-3xl md:text-4xl font-black text-[#3e2723] mb-2 drop-shadow-sm tracking-tighter select-none">
-                            WOODBLOCK <span className="text-amber-100">ZEN</span>
-                        </h1>
-                        <GameControls score={score} level={level} highScore={highScore} onReset={handleRestart} isMusicOn={isMusicOn} onToggleMusic={toggleMusic} />
-                        <div className="mb-8 relative z-10">
-                            <GridBoard 
-                                ref={gridRef} 
-                                grid={grid} 
-                                previewPlacement={previewPlacement} 
-                                clearingCells={clearingCells}
-                            />
-                        </div>
+                        <h1 className="text-3xl md:text-4xl font-black text-[#3e2723] mb-2 drop-shadow-sm tracking-tighter select-none">WOODBLOCK <span className="text-amber-100">ZEN</span></h1>
+                        <GameControls score={score} level={level} highScore={highScore} onReset={() => { localStorage.removeItem('woodblock_gamestate'); setGrid(createEmptyGrid()); setCurrentPieces([generateRandomPiece(), generateRandomPiece(), generateRandomPiece()]); setScore(0); setLevel(1); setGameOverInfo(null); }} isMusicOn={isMusicOn} onToggleMusic={() => setIsMusicOn(!isMusicOn)} />
+                        <div className="mb-8 relative z-10"><GridBoard ref={gridRef} grid={grid} /></div>
                         <div className="w-full bg-[#3e2723]/40 p-4 rounded-xl backdrop-blur-sm min-h-[160px] flex items-center justify-center gap-4 md:gap-8 touch-none relative z-20">
-                            {currentPieces.map((piece, idx) => (
-                                <div key={idx} className="flex-1 flex items-center justify-center min-w-[80px] h-[100px]">
-                                    {piece && (
-                                        <div className={`transition-opacity duration-200 ${dragState?.pieceIndex === idx ? 'opacity-0' : 'opacity-100'}`}>
-                                            <BlockPiece piece={piece} size="md" className="cursor-grab active:cursor-grabbing hover:scale-105" onInteract={(e) => handlePointerDown(e, idx)} />
-                                        </div>
-                                    )}
+                            {currentPieces.map((p, i) => (
+                                <div key={i} className="flex-1 flex items-center justify-center min-w-[80px] h-[100px]">
+                                    {p && <div className={`transition-opacity duration-200 ${dragState?.pieceIndex===i?'opacity-0':'opacity-100'}`}><BlockPiece piece={p} size="md" className="cursor-grab active:cursor-grabbing hover:scale-105" onInteract={(e)=>handlePointerDown(e,i)} /></div>}
                                 </div>
                             ))}
                         </div>
                         {dragState && currentPieces[dragState.pieceIndex] && (
-                            <div 
-                                ref={dragItemRef}
-                                className="fixed pointer-events-none z-[9999] hardware-accelerated" 
-                                style={{ 
-                                    left: 0, 
-                                    top: 0,
-                                    transform: `translate(${dragState.initialX}px, ${dragState.initialY}px)`
-                                }}
-                            >
+                            <div ref={dragItemRef} className="fixed pointer-events-none z-[9999] hardware-accelerated" style={{ left: 0, top: 0, transform: `translate(${dragState.initialX}px, ${dragState.initialY}px)` }}>
                                 <BlockPiece piece={currentPieces[dragState.pieceIndex]} customCellSize={dragState.gridCellSize} isSelected={true} />
                             </div>
                         )}
                         <div className="mt-4 text-stone-400 text-xs text-center select-none">Blokları tahtaya sürükleyin. Puan kazanmak için satırları temizleyin.</div>
-                        
-                        {/* GAME OVER SCREEN */}
                         {gameOverInfo && (
                             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-xl">
                                 <div className="bg-white p-8 rounded-2xl text-center max-w-xs w-full shadow-2xl border-4 border-amber-600 animate-bounce-in">
                                     <h2 className="text-3xl font-black text-stone-800 mb-2">Hamle Yok!</h2>
                                     <p className="text-stone-500 mb-4">Oyun Bitti</p>
-                                    
-                                    <div className="bg-stone-100 p-4 rounded-lg mb-4 flex flex-col items-center">
-                                        <p className="text-xs text-stone-400 mb-2 uppercase font-bold">Bu parça sığmadı</p>
-                                        <BlockPiece piece={gameOverInfo.failedPiece} size="sm" className="pointer-events-none opacity-80 scale-75 origin-center" />
-                                    </div>
-
+                                    <div className="bg-stone-100 p-4 rounded-lg mb-4 flex flex-col items-center"><p className="text-xs text-stone-400 mb-2 uppercase font-bold">Bu parça sığmadı</p><BlockPiece piece={gameOverInfo.failedPiece} size="sm" className="pointer-events-none opacity-80 scale-75 origin-center" /></div>
                                     <div className="text-5xl font-bold text-amber-600 mb-6">{score}</div>
-                                    <button onClick={handleRestart} className="w-full bg-amber-600 text-white font-bold py-4 rounded-lg shadow-lg hover:bg-amber-500 active:scale-95 transition-all">Tekrar Oyna</button>
+                                    <button onClick={() => { localStorage.removeItem('woodblock_gamestate'); setGrid(createEmptyGrid()); setCurrentPieces([generateRandomPiece(), generateRandomPiece(), generateRandomPiece()]); setScore(0); setLevel(1); setGameOverInfo(null); }} className="w-full bg-amber-600 text-white font-bold py-4 rounded-lg shadow-lg hover:bg-amber-500 active:scale-95 transition-all">Tekrar Oyna</button>
                                 </div>
                             </div>
                         )}
@@ -878,7 +406,6 @@
                 </div>
             );
         };
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>

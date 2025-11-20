@@ -25,6 +25,33 @@ const getContext = () => {
   return audioCtx;
 };
 
+export const playPlaceSound = () => {
+  try {
+    const ctx = getContext();
+    if (ctx.state === 'suspended') ctx.resume();
+    
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    // Woodblock-like thud
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, t);
+    osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+    
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.linearRampToValueAtTime(0, t + 0.05);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.start(t);
+    osc.stop(t + 0.1);
+  } catch (e) {
+    console.error("SFX error", e);
+  }
+};
+
 export const playComboSound = (comboCount: number) => {
   try {
     const ctx = getContext();
