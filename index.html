@@ -656,7 +656,7 @@
                         const piece = currentPieces[dragState.pieceIndex];
                         
                         // Apply visual elevation offset for touch devices so finger doesn't cover block
-                        const elevation = dragState.isTouch ? 96 : 0; 
+                        const elevation = dragState.isTouch ? 160 : 0; 
 
                         const pieceLeft = e.clientX - dragState.dragOffset.x;
                         const pieceTop = e.clientY - dragState.dragOffset.y - elevation; // Lift logic position
@@ -735,12 +735,12 @@
                         <div className="mb-8 relative z-10">
                             <GridBoard ref={gridRef} grid={grid} previewPlacement={previewPlacement} />
                         </div>
-                        <div className="w-full bg-[#3e2723]/40 p-4 rounded-xl backdrop-blur-sm min-h-[140px] flex items-center justify-center gap-4 md:gap-8 touch-none relative z-20">
+                        <div className="w-full bg-[#3e2723]/40 p-4 rounded-xl backdrop-blur-sm min-h-[160px] flex items-center justify-center gap-4 md:gap-8 touch-none relative z-20">
                             {currentPieces.map((piece, idx) => (
                                 <div key={idx} className="flex-1 flex items-center justify-center min-w-[80px] h-[100px]">
                                     {piece && (
                                         <div className={`transition-opacity duration-200 ${dragState?.pieceIndex === idx ? 'opacity-0' : 'opacity-100'}`}>
-                                            <BlockPiece piece={piece} size="sm" className="cursor-grab active:cursor-grabbing hover:scale-105" onInteract={(e) => handlePointerDown(e, idx)} />
+                                            <BlockPiece piece={piece} size="md" className="cursor-grab active:cursor-grabbing hover:scale-105" onInteract={(e) => handlePointerDown(e, idx)} />
                                         </div>
                                     )}
                                 </div>
@@ -749,7 +749,7 @@
                         {dragState && currentPieces[dragState.pieceIndex] && (
                             <div className="fixed pointer-events-none z-[9999]" style={{ 
                                 left: dragState.currentPos.x - dragState.dragOffset.x, 
-                                top: dragState.currentPos.y - dragState.dragOffset.y - (dragState.isTouch ? 96 : 0) 
+                                top: dragState.currentPos.y - dragState.dragOffset.y - (dragState.isTouch ? 160 : 0) 
                             }}>
                                 <BlockPiece piece={currentPieces[dragState.pieceIndex]} customCellSize={dragState.gridCellSize} isSelected={true} />
                             </div>
