@@ -462,7 +462,7 @@ const App: React.FC = () => {
       <FPSCounter />
       <div className="max-w-lg w-full flex flex-col items-center relative">
         <h1 className="text-3xl md:text-4xl font-black text-[#3e2723] mb-2 drop-shadow-sm tracking-tighter select-none">
-          WOODBLOCK <span className="text-amber-100">ZEN</span>
+          SnapWood <span className="text-amber-100">Block</span>
         </h1>
 
         <GameControls 
@@ -515,8 +515,8 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <div className="mt-4 text-stone-400 text-xs text-center select-none">
-          Blokları tahtaya sürükleyin. Puan kazanmak için satırları temizleyin.
+        <div className="mt-4 text-amber-200/70 text-xs text-center select-none font-medium tracking-widest">
+          Made in MŞS Studio
         </div>
 
         {gameOverInfo && (

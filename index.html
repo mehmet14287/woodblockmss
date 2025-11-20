@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>WoodBlock Zen - Ahşap Blok Bulmaca</title>
+    <title>SnapWood Block - Ahşap Blok Bulmaca</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -422,7 +422,7 @@
                 <div className="min-h-screen wood-texture flex items-center justify-center p-4 selection:bg-transparent overflow-hidden">
                     <FPSCounter />
                     <div className="max-w-lg w-full flex flex-col items-center relative">
-                        <h1 className="text-3xl md:text-4xl font-black text-[#3e2723] mb-2 drop-shadow-sm tracking-tighter select-none">WOODBLOCK <span className="text-amber-100">ZEN</span></h1>
+                        <h1 className="text-3xl md:text-4xl font-black text-[#3e2723] mb-2 drop-shadow-sm tracking-tighter select-none">SnapWood <span className="text-amber-100">Block</span></h1>
                         <GameControls score={score} level={level} highScore={highScore} onReset={() => { localStorage.removeItem('woodblock_gamestate'); setGrid(createEmptyGrid()); setCurrentPieces([generateRandomPiece(), generateRandomPiece(), generateRandomPiece()]); setScore(0); setLevel(1); setGameOverInfo(null); }} isMusicOn={isMusicOn} onToggleMusic={() => setIsMusicOn(!isMusicOn)} />
                         <div className="mb-8 relative z-10"><GridBoard ref={gridRef} grid={grid} /></div>
                         <div className="w-full bg-[#3e2723]/40 p-4 rounded-xl backdrop-blur-sm min-h-[160px] flex items-center justify-center gap-4 md:gap-8 touch-none relative z-20">
@@ -437,7 +437,7 @@
                                 <BlockPiece piece={currentPieces[dragState.pieceIndex]} customCellSize={dragState.gridCellSize} isSelected={true} />
                             </div>
                         )}
-                        <div className="mt-4 text-stone-400 text-xs text-center select-none">Blokları tahtaya sürükleyin. Puan kazanmak için satırları temizleyin.</div>
+                        <div className="mt-4 text-amber-200/70 text-xs text-center select-none font-medium tracking-widest">Made in MŞS Studio</div>
                         {gameOverInfo && (
                             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-xl">
                                 <div className="bg-white p-8 rounded-2xl text-center max-w-xs w-full shadow-2xl border-4 border-amber-600 animate-bounce-in">
