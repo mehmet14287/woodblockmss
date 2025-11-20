@@ -80,9 +80,30 @@
         };
         const createEmptyGrid = () => Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
 
+        // --- HELPER FUNCTIONS ---
+        const findMatches = (board) => {
+            const rowsToClear = [];
+            const colsToClear = [];
+            const boxesToClear = [];
+            for (let r = 0; r < GRID_SIZE; r++) if (board[r].every(cell => cell === 1)) rowsToClear.push(r);
+            for (let c = 0; c < GRID_SIZE; c++) {
+                let full = true;
+                for (let r = 0; r < GRID_SIZE; r++) if (board[r][c] === 0) { full = false; break; }
+                if (full) colsToClear.push(c);
+            }
+            for (let br = 0; br < 9; br += 3) {
+                for (let bc = 0; bc < 9; bc += 3) {
+                    let full = true;
+                    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) if (board[br + r][bc + c] === 0) { full = false; break; }
+                    if (full) boxesToClear.push({ r: br, c: bc });
+                }
+            }
+            return { rows: rowsToClear, cols: colsToClear, boxes: boxesToClear };
+        };
+
         // --- PARTICLE SYSTEM ---
         const createParticleExplosion = (x, y, color) => {
-            const particleCount = 3; // Reduced for performance on WebView
+            const particleCount = 3; 
             for (let i = 0; i < particleCount; i++) {
                 const el = document.createElement('div');
                 el.className = 'particle';
@@ -139,9 +160,31 @@
             const cellRefs = React.useRef({});
             React.useImperativeHandle(ref, () => ({
                 getBoundingClientRect: () => domRef.current?.getBoundingClientRect(),
-                highlightCells: (positions) => {
-                    Object.values(cellRefs.current).forEach(el => el && el.classList.remove('bg-amber-500/50'));
-                    if (positions) positions.forEach(({r, c}) => { const el = cellRefs.current[`${r}-${c}`]; if (el && !el.classList.contains('filled')) el.classList.add('bg-amber-500/50'); });
+                highlightCells: (placement, clearing) => {
+                    Object.values(cellRefs.current).forEach(el => {
+                        if(el) {
+                            el.classList.remove('bg-amber-500/50');
+                            el.classList.remove('bg-white/50');
+                            el.classList.remove('animate-pulse');
+                            el.classList.remove('z-10');
+                        }
+                    });
+                    if(clearing) {
+                        clearing.forEach(({r, c}) => {
+                            const el = cellRefs.current[`${r}-${c}`];
+                            if(el) {
+                                el.classList.add('bg-white/50');
+                                el.classList.add('animate-pulse');
+                                el.classList.add('z-10');
+                            }
+                        });
+                    }
+                    if(placement) {
+                        placement.forEach(({r, c}) => {
+                            const el = cellRefs.current[`${r}-${c}`];
+                            if(el && !el.classList.contains('filled')) el.classList.add('bg-amber-500/50');
+                        });
+                    }
                 }
             }));
             const isSubgridAlt = (r, c) => (Math.floor(r / 3) + Math.floor(c / 3)) % 2 !== 0;
@@ -219,14 +262,9 @@
             }, []);
 
             const checkMatches = (board) => {
-                let lines = 0, newGrid = board.map(r => [...r]), rows = [], cols = [], boxes = [];
-                for(let r=0; r<9; r++) if(board[r].every(c=>c===1)) rows.push(r);
-                for(let c=0; c<9; c++) if(board.every(r=>r[c]===1)) cols.push(c);
-                for(let br=0; br<9; br+=3) for(let bc=0; bc<9; bc+=3) {
-                    let full=true; for(let r=0; r<3; r++) for(let c=0; c<3; c++) if(board[br+r][bc+c]===0) full=false;
-                    if(full) boxes.push({r:br, c:bc});
-                }
-                lines = rows.length + cols.length + boxes.length;
+                const { rows, cols, boxes } = findMatches(board);
+                const lines = rows.length + cols.length + boxes.length;
+                
                 if(lines > 0) {
                     playComboSound(lines);
                     const rect = gridRef.current?.getBoundingClientRect();
@@ -239,6 +277,8 @@
                     }
                     const mult = lines===1?1:lines===2?3:lines===3?6:10;
                     setScore(s => { const ns = s + 100*mult; if(ns > highScore) { setHighScore(ns); localStorage.setItem('woodblock_highscore', ns); } return ns; });
+                    
+                    const newGrid = board.map(r => [...r]);
                     rows.forEach(r => newGrid[r].fill(0));
                     cols.forEach(c => newGrid.forEach(r => r[c] = 0));
                     boxes.forEach(b => { for(let r=0; r<3; r++) for(let c=0; c<3; c++) newGrid[b.r+r][b.c+c] = 0; });
@@ -258,8 +298,6 @@
                 e.preventDefault(); e.stopPropagation();
                 const rect = e.currentTarget.getBoundingClientRect();
                 const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
-                
-                // Sync initial position
                 pointerPosRef.current = { x: e.clientX, y: e.clientY };
 
                 setDragState({ 
@@ -272,7 +310,6 @@
                 });
             };
 
-            // Render Loop (60 FPS Cap)
             React.useEffect(() => {
                 if(!dragState) return;
                 let afId;
@@ -286,13 +323,11 @@
                         lastTime = time - (delta % FRAME_INTERVAL);
                         const { x: clientX, y: clientY } = pointerPosRef.current;
                         
-                        // 1. Move Drag Item
                         if(dragItemRef.current) {
                             const yOff = dragState.isTouch ? 160 : 0;
                             dragItemRef.current.style.transform = `translate(${clientX - dragState.dragOffset.x}px, ${clientY - dragState.dragOffset.y - yOff}px)`;
                         }
 
-                        // 2. Grid Highlight
                         if(gridRef.current && currentPieces[dragState.pieceIndex]) {
                             const rect = gridRef.current.getBoundingClientRect();
                             const p = currentPieces[dragState.pieceIndex];
@@ -304,12 +339,27 @@
                             
                             if(canPlace(grid, p, r, c)) {
                                 previewRef.current = {row: r, col: c};
-                                const pos = [];
-                                for(let pr=0; pr<p.shape.length; pr++) for(let pc=0; pc<p.shape[0].length; pc++) if(p.shape[pr][pc]) pos.push({r:r+pr, c:c+pc});
-                                gridRef.current.highlightCells(pos);
+                                const placement = [];
+                                const simulatedGrid = grid.map(r=>[...r]);
+                                for(let pr=0; pr<p.shape.length; pr++) for(let pc=0; pc<p.shape[0].length; pc++) {
+                                    if(p.shape[pr][pc]) {
+                                        placement.push({r:r+pr, c:c+pc});
+                                        simulatedGrid[r+pr][c+pc] = 1;
+                                    }
+                                }
+                                
+                                const matches = findMatches(simulatedGrid);
+                                const clearing = [];
+                                if(matches.rows.length>0 || matches.cols.length>0 || matches.boxes.length>0) {
+                                    matches.rows.forEach(ri => { for(let ci=0; ci<9; ci++) clearing.push({r:ri, c:ci}); });
+                                    matches.cols.forEach(ci => { for(let ri=0; ri<9; ri++) clearing.push({r:ri, c:ci}); });
+                                    matches.boxes.forEach(b => { for(let br=0; br<3; br++) for(let bc=0; bc<3; bc++) clearing.push({r:b.r+br, c:b.c+bc}); });
+                                }
+                                
+                                gridRef.current.highlightCells(placement, clearing);
                             } else {
                                 previewRef.current = null;
-                                gridRef.current.highlightCells(null);
+                                gridRef.current.highlightCells(null, null);
                             }
                         }
                     }
@@ -319,14 +369,11 @@
                 return () => cancelAnimationFrame(afId);
             }, [dragState, grid, currentPieces, canPlace]);
 
-            // Input Listener
             React.useEffect(() => {
                 if(!dragState) return;
                 const move = (e) => { e.preventDefault(); pointerPosRef.current = { x: e.clientX, y: e.clientY }; };
                 const up = (e) => {
                     e.preventDefault();
-                    
-                    // Re-calculate placement using EXACT pointer position (in case frame was skipped)
                     let finalPlacement = previewRef.current;
                     if(gridRef.current && currentPieces[dragState.pieceIndex]) {
                          const rect = gridRef.current.getBoundingClientRect();
@@ -364,7 +411,7 @@
                             if(lost) setGameOverInfo(lost);
                         }
                     }
-                    setDragState(null); previewRef.current = null; gridRef.current?.highlightCells(null);
+                    setDragState(null); previewRef.current = null; gridRef.current?.highlightCells(null, null);
                 };
                 window.addEventListener('pointermove', move, {passive: false});
                 window.addEventListener('pointerup', up);

@@ -13,9 +13,35 @@ import {
 } from './constants';
 import { BlockPiece as BlockPieceType } from './types';
 
+// Helper to check matches on a given board state (pure function)
+const findMatches = (board: number[][]) => {
+    const rowsToClear: number[] = [];
+    const colsToClear: number[] = [];
+    const boxesToClear: {r: number, c: number}[] = [];
+
+    // Rows
+    for (let r = 0; r < GRID_SIZE; r++) {
+        if (board[r].every(cell => cell === 1)) rowsToClear.push(r);
+    }
+    // Cols
+    for (let c = 0; c < GRID_SIZE; c++) {
+        let full = true;
+        for (let r = 0; r < GRID_SIZE; r++) if (board[r][c] === 0) { full = false; break; }
+        if (full) colsToClear.push(c);
+    }
+    // Boxes
+    for (let br = 0; br < 9; br += 3) {
+        for (let bc = 0; bc < 9; bc += 3) {
+            let full = true;
+            for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) if (board[br + r][bc + c] === 0) { full = false; break; }
+            if (full) boxesToClear.push({ r: br, c: bc });
+        }
+    }
+    return { rows: rowsToClear, cols: colsToClear, boxes: boxesToClear };
+};
+
 // Helper to create direct particle explosions without React
 const createParticleExplosion = (x: number, y: number, color: string) => {
-    // Reduced particle count for performance on WebViews
     const particleCount = 3; 
     for (let i = 0; i < particleCount; i++) {
         const el = document.createElement('div');
@@ -153,25 +179,9 @@ const App: React.FC = () => {
   }, []);
 
   const checkMatches = (board: number[][]) => {
-    const rowsToClear: number[] = [];
-    const colsToClear: number[] = [];
-    const boxesToClear: {r: number, c: number}[] = [];
+    const { rows, cols, boxes } = findMatches(board);
 
-    for (let r = 0; r < GRID_SIZE; r++) if (board[r].every(cell => cell === 1)) rowsToClear.push(r);
-    for (let c = 0; c < GRID_SIZE; c++) {
-      let full = true;
-      for (let r = 0; r < GRID_SIZE; r++) if (board[r][c] === 0) { full = false; break; }
-      if (full) colsToClear.push(c);
-    }
-    for (let br = 0; br < 9; br += 3) {
-      for (let bc = 0; bc < 9; bc += 3) {
-        let full = true;
-        for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) if (board[br + r][bc + c] === 0) { full = false; break; }
-        if (full) boxesToClear.push({ r: br, c: bc });
-      }
-    }
-
-    const lines = rowsToClear.length + colsToClear.length + boxesToClear.length;
+    const lines = rows.length + cols.length + boxes.length;
     if (lines > 0) {
       playComboSound(lines);
       
@@ -184,9 +194,9 @@ const App: React.FC = () => {
         });
 
         const clearedCells = new Set<string>();
-        rowsToClear.forEach(r => { for(let c=0; c<9; c++) clearedCells.add(`${r}-${c}`); });
-        colsToClear.forEach(c => { for(let r=0; r<9; r++) clearedCells.add(`${r}-${c}`); });
-        boxesToClear.forEach(b => { for(let r=0; r<3; r++) for(let c=0; c<3; c++) clearedCells.add(`${b.r+r}-${b.c+c}`); });
+        rows.forEach(r => { for(let c=0; c<9; c++) clearedCells.add(`${r}-${c}`); });
+        cols.forEach(c => { for(let r=0; r<9; r++) clearedCells.add(`${r}-${c}`); });
+        boxes.forEach(b => { for(let r=0; r<3; r++) for(let c=0; c<3; c++) clearedCells.add(`${b.r+r}-${b.c+c}`); });
 
         clearedCells.forEach(key => {
             const [r, c] = key.split('-').map(Number);
@@ -199,9 +209,9 @@ const App: React.FC = () => {
       addScore(newScore);
 
       const newGrid = board.map(row => [...row]);
-      rowsToClear.forEach(r => { for(let c=0; c<GRID_SIZE; c++) newGrid[r][c] = 0; });
-      colsToClear.forEach(c => { for(let r=0; r<GRID_SIZE; r++) newGrid[r][c] = 0; });
-      boxesToClear.forEach(box => { for(let r=0; r<3; r++) for(let c=0; c<3; c++) newGrid[box.r + r][box.c + c] = 0; });
+      rows.forEach(r => { for(let c=0; c<GRID_SIZE; c++) newGrid[r][c] = 0; });
+      cols.forEach(c => { for(let r=0; r<GRID_SIZE; r++) newGrid[r][c] = 0; });
+      boxes.forEach(box => { for(let r=0; r<3; r++) for(let c=0; c<3; c++) newGrid[box.r + r][box.c + c] = 0; });
 
       setGrid(newGrid);
     }
@@ -308,17 +318,40 @@ const App: React.FC = () => {
                 if (canPlacePiece(grid, piece, row, col)) {
                     previewRef.current = { row, col, shape: piece.shape };
                     
-                    // Direct DOM Highlight
-                    const positions: {r: number, c: number}[] = [];
+                    const placementPositions: {r: number, c: number}[] = [];
+                    const clearingPositions: {r: number, c: number}[] = [];
+
+                    // Create a lightweight simulation grid
+                    const simulatedGrid = grid.map(r => [...r]);
+
                     for(let r=0; r<piece.shape.length; r++){
                         for(let c=0; c<piece.shape[0].length; c++){
-                            if(piece.shape[r][c]) positions.push({r: row+r, c: col+c});
+                            if(piece.shape[r][c]) {
+                                placementPositions.push({r: row+r, c: col+c});
+                                simulatedGrid[row+r][col+c] = 1;
+                            }
                         }
                     }
-                    gridRef.current.highlightCells(positions);
+
+                    // Check for potential matches
+                    const matches = findMatches(simulatedGrid);
+                    if (matches.rows.length > 0 || matches.cols.length > 0 || matches.boxes.length > 0) {
+                        matches.rows.forEach(rIndex => {
+                            for(let cIndex=0; cIndex<9; cIndex++) clearingPositions.push({r: rIndex, c: cIndex});
+                        });
+                        matches.cols.forEach(cIndex => {
+                            for(let rIndex=0; rIndex<9; rIndex++) clearingPositions.push({r: rIndex, c: cIndex});
+                        });
+                        matches.boxes.forEach(box => {
+                            for(let br=0; br<3; br++) for(let bc=0; bc<3; bc++) clearingPositions.push({r: box.r+br, c: box.c+bc});
+                        });
+                    }
+                    
+                    // Pass both placement and clearing data
+                    gridRef.current.highlightCells(placementPositions, clearingPositions);
                 } else {
                     previewRef.current = null;
-                    gridRef.current.highlightCells(null);
+                    gridRef.current.highlightCells(null, null);
                 }
             }
         }
@@ -347,8 +380,8 @@ const App: React.FC = () => {
     const handleUp = (e: PointerEvent) => {
       e.preventDefault();
       
-      // RE-CALCULATE placement on drop to ensure precision even if frames were skipped
       let finalPlacement = previewRef.current;
+      // Fallback calculation just in case
       if (gridRef.current && currentPieces[dragState.pieceIndex]) {
            const gridRect = gridRef.current.getBoundingClientRect();
            const piece = currentPieces[dragState.pieceIndex]!;
@@ -404,10 +437,9 @@ const App: React.FC = () => {
         }
       }
 
-      // Cleanup
       setDragState(null);
       previewRef.current = null;
-      if (gridRef.current) gridRef.current.highlightCells(null);
+      if (gridRef.current) gridRef.current.highlightCells(null, null);
     };
     
     window.addEventListener('pointerup', handleUp);
@@ -466,7 +498,6 @@ const App: React.FC = () => {
           ))}
         </div>
 
-        {/* Draggable Portal using Direct DOM Ref */}
         {dragState && currentPieces[dragState.pieceIndex] && (
           <div 
              ref={dragItemRef}

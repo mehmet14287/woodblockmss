@@ -15,15 +15,39 @@ const GridBoard = React.memo(React.forwardRef<any, Props>(({ grid, onCellClick, 
   React.useImperativeHandle(ref, () => ({
     // Use domRef.current to access the actual DOM element
     getBoundingClientRect: () => domRef.current?.getBoundingClientRect(),
-    highlightCells: (positions: {r: number, c: number}[] | null) => {
-      // Reset all
+    highlightCells: (
+      placement: {r: number, c: number}[] | null,
+      clearing: {r: number, c: number}[] | null
+    ) => {
+      // Reset all highlights
       Object.values(cellRefs.current).forEach(el => {
-        if(el) (el as HTMLElement).classList.remove('bg-amber-500/50');
+        if(el) {
+          const div = el as HTMLElement;
+          div.classList.remove('bg-amber-500/50');
+          div.classList.remove('bg-white/50');
+          div.classList.remove('animate-pulse');
+          div.classList.remove('z-10'); // Remove z-index boost
+        }
       });
-      // Highlight new
-      if(positions) {
-        positions.forEach(({r, c}) => {
+      
+      // Highlight clearing (Combos) - Visualized as white pulse
+      if(clearing) {
+        clearing.forEach(({r, c}) => {
           const el = cellRefs.current[`${r}-${c}`];
+          if(el) {
+            el.classList.add('bg-white/50');
+            el.classList.add('animate-pulse');
+            el.classList.add('z-10'); // Bring to front
+          }
+        });
+      }
+
+      // Highlight placement (The piece itself)
+      if(placement) {
+        placement.forEach(({r, c}) => {
+          const el = cellRefs.current[`${r}-${c}`];
+          // Only highlight if not already filled (though logic prevents placement on filled)
+          // If it is also a clearing cell, the white pulse takes precedence or mixes
           if(el && !el.classList.contains('filled')) { 
             el.classList.add('bg-amber-500/50');
           }
@@ -48,8 +72,6 @@ const GridBoard = React.memo(React.forwardRef<any, Props>(({ grid, onCellClick, 
           <div key={rIndex} className="grid grid-cols-9 gap-[2px]">
             {row.map((cell, cIndex) => {
               const isFilled = cell === 1;
-              // We handle highlighting via Direct DOM manipulation in highlightCells now
-              // to avoid re-renders of the entire board during drag.
               
               return (
                 <div
@@ -88,7 +110,6 @@ const GridBoard = React.memo(React.forwardRef<any, Props>(({ grid, onCellClick, 
     </div>
   );
 }), (prevProps, nextProps) => {
-    // Custom comparison for React.memo to prevent re-renders when only preview changes (handled by DOM)
     return prevProps.grid === nextProps.grid;
 });
 
