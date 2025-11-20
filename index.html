@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -509,7 +510,6 @@
             React.useEffect(() => {
                 localStorage.setItem(STORAGE_KEY_MUSIC, JSON.stringify(isMusicOn));
                 if (isMusicOn) {
-                    // Try to start music, might require interaction first due to browser policy
                     const ctx = getAudioContext();
                     if (ctx.state === 'suspended') {
                         const resumeAudio = () => {
@@ -633,12 +633,16 @@
                 let gridCellSize = 32;
                 if (gridRef.current) gridCellSize = gridRef.current.getBoundingClientRect().width / 9;
 
+                // Detect if this is a touch event to apply visual offset
+                const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
+
                 setDragState({
                     isDragging: true, pieceIndex: index,
                     startPos: { x: e.clientX, y: e.clientY },
                     currentPos: { x: e.clientX, y: e.clientY },
                     dragOffset: { x: offsetX, y: offsetY },
-                    gridCellSize
+                    gridCellSize,
+                    isTouch // Store touch state
                 });
             };
 
@@ -650,8 +654,13 @@
                     if (gridRef.current && currentPieces[dragState.pieceIndex]) {
                         const gridRect = gridRef.current.getBoundingClientRect();
                         const piece = currentPieces[dragState.pieceIndex];
+                        
+                        // Apply visual elevation offset for touch devices so finger doesn't cover block
+                        const elevation = dragState.isTouch ? 96 : 0; 
+
                         const pieceLeft = e.clientX - dragState.dragOffset.x;
-                        const pieceTop = e.clientY - dragState.dragOffset.y;
+                        const pieceTop = e.clientY - dragState.dragOffset.y - elevation; // Lift logic position
+                        
                         const relativeX = pieceLeft - gridRect.left + (dragState.gridCellSize / 2);
                         const relativeY = pieceTop - gridRect.top + (dragState.gridCellSize / 2);
                         const col = Math.floor(relativeX / dragState.gridCellSize);
@@ -738,7 +747,10 @@
                             ))}
                         </div>
                         {dragState && currentPieces[dragState.pieceIndex] && (
-                            <div className="fixed pointer-events-none z-[9999]" style={{ left: dragState.currentPos.x - dragState.dragOffset.x, top: dragState.currentPos.y - dragState.dragOffset.y }}>
+                            <div className="fixed pointer-events-none z-[9999]" style={{ 
+                                left: dragState.currentPos.x - dragState.dragOffset.x, 
+                                top: dragState.currentPos.y - dragState.dragOffset.y - (dragState.isTouch ? 96 : 0) 
+                            }}>
                                 <BlockPiece piece={currentPieces[dragState.pieceIndex]} customCellSize={dragState.gridCellSize} isSelected={true} />
                             </div>
                         )}
