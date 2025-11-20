@@ -36,6 +36,12 @@
         .animate-bounce-in {
             animation: bounceIn 0.5s cubic-bezier(0.215, 0.610, 0.355, 1.000) both;
         }
+
+        /* Hardware acceleration for moving parts */
+        .hardware-accelerated {
+            will-change: transform, top, left;
+            transform: translateZ(0);
+        }
     </style>
 <script type="importmap">
 {
@@ -255,7 +261,7 @@
 
         // --- COMPONENTS ---
 
-        const ParticleOverlay = ({ bursts, onComplete }) => {
+        const ParticleOverlay = React.memo(({ bursts, onComplete }) => {
             const canvasRef = React.useRef(null);
             const particles = React.useRef([]);
             const frameId = React.useRef(0);
@@ -322,12 +328,12 @@
                     cancelAnimationFrame(frameId.current);
                     particles.current = [];
                 };
-            }, [bursts]);
+            }, [bursts, onComplete]);
 
             return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[1000]" />;
-        };
+        });
 
-        const BlockPiece = ({ piece, size = 'md', customCellSize, className = '', onInteract, isSelected, style }) => {
+        const BlockPiece = React.memo(({ piece, size = 'md', customCellSize, className = '', onInteract, isSelected, style }) => {
             const cellSize = customCellSize || (size === 'sm' ? 12 : size === 'md' ? 20 : 32);
             const gap = 1;
             const rows = piece.shape.length;
@@ -335,7 +341,7 @@
 
             return (
                 <div 
-                    className={`relative inline-block select-none touch-none transition-transform duration-75 ${isSelected ? 'brightness-110 drop-shadow-2xl z-50' : ''} ${className}`}
+                    className={`relative inline-block select-none touch-none transition-transform duration-75 ${isSelected ? 'brightness-110 drop-shadow-2xl z-50 hardware-accelerated' : ''} ${className}`}
                     style={{ 
                         width: cols * cellSize + (cols - 1) * gap, 
                         height: rows * cellSize + (rows - 1) * gap,
@@ -363,9 +369,9 @@
                     ))}
                 </div>
             );
-        };
+        });
 
-        const GridBoard = React.forwardRef(({ grid, onCellClick, previewPlacement }, ref) => {
+        const GridBoard = React.memo(React.forwardRef(({ grid, onCellClick, previewPlacement }, ref) => {
             const isSubgridAlt = (r, c) => {
                 const boxRow = Math.floor(r / 3);
                 const boxCol = Math.floor(c / 3);
@@ -373,7 +379,7 @@
             };
 
             return (
-                <div ref={ref} className="relative p-1 sm:p-2 bg-[#5d4037] rounded-lg shadow-2xl border-4 border-[#3e2723] touch-none select-none">
+                <div ref={ref} className="relative p-1 sm:p-2 bg-[#5d4037] rounded-lg shadow-2xl border-4 border-[#3e2723] touch-none select-none hardware-accelerated">
                     <div className="grid grid-rows-9 gap-[2px]">
                         {grid.map((row, rIndex) => (
                             <div key={rIndex} className="grid grid-cols-9 gap-[2px]">
@@ -414,9 +420,18 @@
                     </div>
                 </div>
             );
+        }), (prevProps, nextProps) => {
+            // Custom comparison to prevent re-renders during drag if preview hasn't changed
+            if (prevProps.grid !== nextProps.grid) return false;
+            if (prevProps.previewPlacement === null && nextProps.previewPlacement === null) return true;
+            if (prevProps.previewPlacement && nextProps.previewPlacement) {
+                return prevProps.previewPlacement.row === nextProps.previewPlacement.row && 
+                       prevProps.previewPlacement.col === nextProps.previewPlacement.col;
+            }
+            return false;
         });
 
-        const GameControls = ({ score, level, highScore, onReset, isMusicOn, onToggleMusic }) => {
+        const GameControls = React.memo(({ score, level, highScore, onReset, isMusicOn, onToggleMusic }) => {
             return (
                 <div className="w-full max-w-md mx-auto mb-4 flex flex-col gap-4">
                     <div className="flex justify-between items-center bg-[#3e2723] p-4 rounded-xl border-b-4 border-[#271815] shadow-lg">
@@ -447,7 +462,7 @@
                     </div>
                 </div>
             );
-        };
+        });
 
         // Storage Keys
         const STORAGE_KEY_GAME = 'woodblock_gamestate';
@@ -485,6 +500,7 @@
             });
 
             const gridRef = React.useRef(null);
+            const animationFrameRef = React.useRef(null);
             const [dragState, setDragState] = React.useState(null);
             const [previewPlacement, setPreviewPlacement] = React.useState(null);
             const [gameOver, setGameOver] = React.useState(false);
@@ -529,11 +545,11 @@
                 }
             }, [isMusicOn]);
 
-            const toggleMusic = () => {
+            const toggleMusic = React.useCallback(() => {
                 setIsMusicOn(prev => !prev);
-            };
+            }, []);
 
-            const canPlacePiece = (board, piece, row, col) => {
+            const canPlacePiece = React.useCallback((board, piece, row, col) => {
                 const shape = piece.shape;
                 const rLen = shape.length;
                 const cLen = shape[0].length;
@@ -544,7 +560,7 @@
                     }
                 }
                 return true;
-            };
+            }, []);
 
             const checkMatches = (board) => {
                 let newScore = 0;
@@ -622,7 +638,7 @@
                 return true;
             };
 
-            const handlePointerDown = (e, index) => {
+            const handlePointerDown = React.useCallback((e, index) => {
                 if (!currentPieces[index]) return;
                 e.preventDefault();
                 e.stopPropagation();
@@ -633,7 +649,6 @@
                 let gridCellSize = 32;
                 if (gridRef.current) gridCellSize = gridRef.current.getBoundingClientRect().width / 9;
 
-                // Detect if this is a touch event to apply visual offset
                 const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
 
                 setDragState({
@@ -642,38 +657,54 @@
                     currentPos: { x: e.clientX, y: e.clientY },
                     dragOffset: { x: offsetX, y: offsetY },
                     gridCellSize,
-                    isTouch // Store touch state
+                    isTouch
                 });
-            };
+            }, [currentPieces]);
 
             React.useEffect(() => {
                 if (!dragState) return;
+
                 const handlePointerMove = (e) => {
                     e.preventDefault();
-                    setDragState(prev => prev ? { ...prev, currentPos: { x: e.clientX, y: e.clientY } } : null);
-                    if (gridRef.current && currentPieces[dragState.pieceIndex]) {
-                        const gridRect = gridRef.current.getBoundingClientRect();
-                        const piece = currentPieces[dragState.pieceIndex];
-                        
-                        // Apply visual elevation offset for touch devices so finger doesn't cover block
-                        const elevation = dragState.isTouch ? 160 : 0; 
-
-                        const pieceLeft = e.clientX - dragState.dragOffset.x;
-                        const pieceTop = e.clientY - dragState.dragOffset.y - elevation; // Lift logic position
-                        
-                        const relativeX = pieceLeft - gridRect.left + (dragState.gridCellSize / 2);
-                        const relativeY = pieceTop - gridRect.top + (dragState.gridCellSize / 2);
-                        const col = Math.floor(relativeX / dragState.gridCellSize);
-                        const row = Math.floor(relativeY / dragState.gridCellSize);
-                        if (canPlacePiece(grid, piece, row, col)) {
-                            setPreviewPlacement({ row, col, shape: piece.shape });
-                        } else {
-                            setPreviewPlacement(null);
-                        }
+                    
+                    // Optimization: Use requestAnimationFrame to throttle updates to screen refresh rate
+                    // This prevents excessive processing on high refresh rate devices (120hz+)
+                    if (animationFrameRef.current) {
+                        cancelAnimationFrame(animationFrameRef.current);
                     }
+
+                    animationFrameRef.current = requestAnimationFrame(() => {
+                        setDragState(prev => prev ? { ...prev, currentPos: { x: e.clientX, y: e.clientY } } : null);
+                        
+                        if (gridRef.current && currentPieces[dragState.pieceIndex]) {
+                            const gridRect = gridRef.current.getBoundingClientRect();
+                            const piece = currentPieces[dragState.pieceIndex];
+                            
+                            const elevation = dragState.isTouch ? 160 : 0; 
+                            const pieceLeft = e.clientX - dragState.dragOffset.x;
+                            const pieceTop = e.clientY - dragState.dragOffset.y - elevation;
+                            
+                            const relativeX = pieceLeft - gridRect.left + (dragState.gridCellSize / 2);
+                            const relativeY = pieceTop - gridRect.top + (dragState.gridCellSize / 2);
+                            const col = Math.floor(relativeX / dragState.gridCellSize);
+                            const row = Math.floor(relativeY / dragState.gridCellSize);
+                            
+                            if (canPlacePiece(grid, piece, row, col)) {
+                                setPreviewPlacement(prev => {
+                                    if (prev && prev.row === row && prev.col === col) return prev;
+                                    return { row, col, shape: piece.shape };
+                                });
+                            } else {
+                                setPreviewPlacement(prev => prev ? null : prev);
+                            }
+                        }
+                    });
                 };
+
                 const handlePointerUp = (e) => {
                     e.preventDefault();
+                    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+
                     if (previewPlacement && dragState && currentPieces[dragState.pieceIndex]) {
                         const piece = currentPieces[dragState.pieceIndex];
                         const { row, col } = previewPlacement;
@@ -706,15 +737,17 @@
                     setDragState(null);
                     setPreviewPlacement(null);
                 };
+
                 window.addEventListener('pointermove', handlePointerMove, { passive: false });
                 window.addEventListener('pointerup', handlePointerUp);
                 return () => {
                     window.removeEventListener('pointermove', handlePointerMove);
                     window.removeEventListener('pointerup', handlePointerUp);
+                    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
                 };
-            }, [dragState, grid, currentPieces, previewPlacement]);
+            }, [dragState, grid, currentPieces, previewPlacement, canPlacePiece]);
 
-            const handleRestart = () => {
+            const handleRestart = React.useCallback(() => {
                 localStorage.removeItem(STORAGE_KEY_GAME);
                 setGrid(createEmptyGrid());
                 setCurrentPieces([generateRandomPiece(), generateRandomPiece(), generateRandomPiece()]);
@@ -722,7 +755,7 @@
                 setLevel(1);
                 setGameOver(false);
                 setDragState(null);
-            };
+            }, []);
 
             return (
                 <div className="min-h-screen wood-texture flex items-center justify-center p-4 selection:bg-transparent overflow-hidden">
@@ -747,7 +780,7 @@
                             ))}
                         </div>
                         {dragState && currentPieces[dragState.pieceIndex] && (
-                            <div className="fixed pointer-events-none z-[9999]" style={{ 
+                            <div className="fixed pointer-events-none z-[9999] hardware-accelerated" style={{ 
                                 left: dragState.currentPos.x - dragState.dragOffset.x, 
                                 top: dragState.currentPos.y - dragState.dragOffset.y - (dragState.isTouch ? 160 : 0) 
                             }}>
